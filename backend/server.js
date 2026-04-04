@@ -537,6 +537,373 @@ ${combined}`,
   }
 });
 
+// ── Agent Tools ───────────────────────────────────────────
+
+const AGENT_TOOLS = [
+  {
+    name: "list_modules",
+    description: "List all modules in the course. Always call this first to understand course structure before doing anything else.",
+    input_schema: { type: "object", properties: {}, required: [] }
+  },
+  {
+    name: "get_module_files",
+    description: "Get the files and PDFs inside a specific module. Use this after list_modules to find what files are available.",
+    input_schema: {
+      type: "object",
+      properties: {
+        module_id: { type: "string", description: "The numeric module ID from list_modules" },
+        module_name: { type: "string", description: "Module name for context" }
+      },
+      required: ["module_id"]
+    }
+  },
+  {
+    name: "extract_pdf",
+    description: "Download and extract the full text content from a PDF file. Use this to actually READ course material. Returns up to 25000 characters of text.",
+    input_schema: {
+      type: "object",
+      properties: {
+        file_id: { type: "string", description: "The numeric file ID" },
+        file_name: { type: "string", description: "File name for context" }
+      },
+      required: ["file_id"]
+    }
+  },
+  {
+    name: "list_assignments",
+    description: "Get all assignments for the course with their due dates and point values.",
+    input_schema: { type: "object", properties: {}, required: [] }
+  }
+];
+
+const AGENT_SYSTEM_PROMPT = `You are an autonomous study agent for a Canvas LMS course.
+You have tools to explore course structure, read module files, extract PDF content, and check assignments.
+
+Your workflow:
+1. ALWAYS start by calling list_modules to understand course structure
+2. Call get_module_files on relevant modules to find PDFs
+3. Call extract_pdf on important files to read the actual content
+4. Call list_assignments to understand deadlines when making study plans
+5. Synthesize everything into a comprehensive, actionable response
+
+Be thorough — read multiple PDFs if the task requires understanding course content.
+Prioritize files that look most important based on their names and module context.`;
+
+async function executeTool(name, input, courseId) {
+  if (name === "list_modules") {
+    const modules = await canvasRequestAll(
+      `/courses/${courseId}/modules?per_page=50&include[]=items_count`
+    );
+    return modules.map((m) => ({
+      id: String(m.id),
+      name: m.name,
+      items_count: m.items_count,
+      state: m.state,
+    }));
+  }
+
+  if (name === "get_module_files") {
+    const items = await canvasRequestAll(
+      `/courses/${courseId}/modules/${input.module_id}/items?per_page=100`
+    );
+    const fileItems = items.filter((item) => item.type === "File");
+    const enriched = await Promise.all(
+      fileItems.map(async (item) => {
+        if (!item.content_id) return null;
+        try {
+          const file = await canvasRequest(
+            `/courses/${courseId}/files/${item.content_id}`
+          );
+          return {
+            id: String(file.id),
+            name: file.display_name || file.filename,
+            is_pdf:
+              (file.content_type || "").includes("pdf") ||
+              (file.filename || "").toLowerCase().endsWith(".pdf"),
+            size: file.size,
+          };
+        } catch {
+          return {
+            id: String(item.content_id),
+            name: item.title,
+            is_pdf: (item.title || "").toLowerCase().endsWith(".pdf"),
+            size: null,
+          };
+        }
+      })
+    );
+    return enriched.filter(Boolean);
+  }
+
+  if (name === "extract_pdf") {
+    const fileIdStr = String(input.file_id);
+
+    // Check cache first
+    if (textCache.has(fileIdStr)) {
+      const text = textCache.get(fileIdStr);
+      return {
+        file_name: input.file_name || fileIdStr,
+        chars: text.length,
+        text: text.slice(0, 25000) + (text.length > 25000 ? "\n...[truncated]" : ""),
+      };
+    }
+
+    // Fetch metadata and download
+    const file = await canvasRequest(`/courses/${courseId}/files/${fileIdStr}`);
+    if (!file.url) throw new Error("File has no download URL");
+
+    const buffer = await downloadCanvasFile(file.url);
+    const pdfData = await pdf(buffer);
+    const text = pdfData.text || "";
+
+    if (text) textCache.set(fileIdStr, text);
+
+    return {
+      file_name: file.display_name || input.file_name || fileIdStr,
+      chars: text.length,
+      text: text.slice(0, 25000) + (text.length > 25000 ? "\n...[truncated]" : ""),
+    };
+  }
+
+  if (name === "list_assignments") {
+    const assignments = await canvasRequestAll(
+      `/courses/${courseId}/assignments?per_page=50&order_by=due_at`
+    );
+    return assignments.map((a) => ({
+      name: a.name,
+      due_at: a.due_at,
+      points_possible: a.points_possible,
+    }));
+  }
+
+  throw new Error(`Unknown tool: ${name}`);
+}
+
+function makeToolPreview(name, input, result) {
+  if (name === "list_modules") {
+    const names = result.slice(0, 3).map((m) => m.name).join(", ");
+    const more = result.length > 3 ? `, +${result.length - 3} more` : "";
+    return `Found ${result.length} modules: ${names}${more}`;
+  }
+  if (name === "get_module_files") {
+    const names = result.slice(0, 3).map((f) => f.name).join(", ");
+    const more = result.length > 3 ? `, +${result.length - 3} more` : "";
+    return `Found ${result.length} files in ${input.module_name || "module"}: ${names}${more}`;
+  }
+  if (name === "extract_pdf") {
+    const kb = Math.round(result.chars / 1000);
+    return `Extracted ${kb}k chars from ${result.file_name}`;
+  }
+  if (name === "list_assignments") {
+    const next = result.find((a) => a.due_at && new Date(a.due_at) > new Date());
+    if (next) {
+      const date = new Date(next.due_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return `Found ${result.length} assignments, next due: ${next.name} on ${date}`;
+    }
+    return `Found ${result.length} assignments`;
+  }
+  return "Done";
+}
+
+// ── Agent SSE Endpoint ────────────────────────────────────
+
+app.post("/api/agent", async (req, res) => {
+  const { task, courseId } = req.body;
+
+  if (!task || !courseId) {
+    return res.status(400).json({ error: "task and courseId are required" });
+  }
+
+  // Set SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  function sendEvent(data) {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  }
+
+  try {
+    const ai = getAnthropic();
+    const messages = [{ role: "user", content: task }];
+    const MAX_ITERATIONS = 12;
+
+    for (let step = 0; step < MAX_ITERATIONS; step++) {
+      sendEvent({ type: "thinking", step });
+
+      const response = await ai.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 8192,
+        system: AGENT_SYSTEM_PROMPT,
+        tools: AGENT_TOOLS,
+        messages,
+      });
+
+      // Collect tool use blocks and text blocks
+      const toolUseBlocks = response.content.filter((b) => b.type === "tool_use");
+      const textBlocks = response.content.filter((b) => b.type === "text");
+
+      // If no tool calls: extract final answer text
+      if (toolUseBlocks.length === 0 || response.stop_reason === "end_turn") {
+        const answerText = textBlocks.map((b) => b.text).join("\n\n").trim();
+        if (answerText) {
+          sendEvent({ type: "answer", text: answerText });
+        }
+        break;
+      }
+
+      // Add assistant message with all content blocks
+      messages.push({ role: "assistant", content: response.content });
+
+      // Execute all tool calls and collect results
+      const toolResults = [];
+      for (const toolBlock of toolUseBlocks) {
+        sendEvent({
+          type: "tool_call",
+          tool: toolBlock.name,
+          input: toolBlock.input,
+        });
+
+        let resultContent;
+        let success = true;
+        let preview = "";
+
+        try {
+          const result = await executeTool(toolBlock.name, toolBlock.input, courseId);
+          resultContent = JSON.stringify(result);
+          preview = makeToolPreview(toolBlock.name, toolBlock.input, result);
+        } catch (err) {
+          success = false;
+          resultContent = JSON.stringify({ error: err.message });
+          preview = `Error: ${err.message}`;
+        }
+
+        sendEvent({
+          type: "tool_result",
+          tool: toolBlock.name,
+          success,
+          preview,
+        });
+
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: toolBlock.id,
+          content: resultContent,
+        });
+      }
+
+      // Add user message with all tool results
+      messages.push({ role: "user", content: toolResults });
+
+      // If stop_reason was tool_use, continue loop; otherwise break
+      if (response.stop_reason !== "tool_use") break;
+    }
+
+    sendEvent({ type: "done" });
+  } catch (err) {
+    sendEvent({ type: "error", message: err.message });
+  } finally {
+    res.end();
+  }
+});
+
+// ── Generate Video Lesson ─────────────────────────────────
+
+app.post("/api/generate-lesson", async (req, res) => {
+  const { text, title } = req.body;
+  if (!text) return res.status(400).json({ error: "text is required" });
+
+  try {
+    const ai = getAnthropic();
+    const truncated = text.length > 22000 ? text.slice(0, 22000) + "\n...[truncated]" : text;
+
+    const message = await ai.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4000,
+      messages: [{
+        role: "user",
+        content: `You are an expert educator creating a narrated video lesson from course material.
+
+Return ONLY valid JSON — no markdown, no explanation, just the JSON object:
+
+{
+  "title": "concise lesson title",
+  "subject": "subject area in 3-5 words",
+  "estimated_minutes": 7,
+  "slides": [
+    {
+      "id": 1,
+      "type": "title",
+      "heading": "Lesson Title",
+      "subheading": "What students will learn",
+      "narration": "Natural 2-3 sentence spoken welcome. Should sound like a teacher, not a robot.",
+      "duration_seconds": 7
+    },
+    {
+      "id": 2,
+      "type": "concept",
+      "heading": "Concept Name",
+      "bullets": ["Key point one", "Key point two", "Key point three"],
+      "narration": "Natural 3-5 sentence spoken explanation. Flow like a professor speaking to students, don't just read the bullets.",
+      "duration_seconds": 20
+    },
+    {
+      "id": 3,
+      "type": "definition",
+      "term": "Technical Term",
+      "definition": "Clear one-sentence definition.",
+      "example": "Concrete real-world example (optional)",
+      "narration": "Natural 2-3 sentence spoken explanation including why this term matters.",
+      "duration_seconds": 14
+    },
+    {
+      "id": 4,
+      "type": "example",
+      "heading": "Example or Application",
+      "bullets": ["Step or detail one", "Step or detail two", "Step or detail three"],
+      "narration": "Walk through the example naturally, 3-4 sentences.",
+      "duration_seconds": 18
+    },
+    {
+      "id": 999,
+      "type": "summary",
+      "heading": "Key Takeaways",
+      "bullets": ["Most important insight 1", "Most important insight 2", "Most important insight 3", "Most important insight 4"],
+      "narration": "Natural 2-3 sentence wrap-up. Tell students what to remember.",
+      "duration_seconds": 16
+    }
+  ]
+}
+
+Rules:
+- Generate exactly 8-14 slides
+- First slide: type "title". Last slide: type "summary"
+- Mix concept, definition, example slides based on actual content
+- Narration sounds NATURAL when spoken aloud — conversational, not bullet-reading
+- Bullets: max 4 per slide, short phrases only (5-8 words each)
+- duration_seconds ≈ narration word count ÷ 2.3
+- Focus on the most important ideas from the material
+
+Material title: "${title || "Course Material"}"
+
+Content:
+${truncated}`
+      }]
+    });
+
+    const raw = message.content[0]?.text || "";
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Could not parse lesson JSON from response");
+
+    const lesson = JSON.parse(jsonMatch[0]);
+    res.json(lesson);
+  } catch (err) {
+    res.status(500).json({ error: `Lesson generation failed: ${err.message}` });
+  }
+});
+
 // ── Start ──────────────────────────────────────────────────
 
 app.listen(PORT, () => {

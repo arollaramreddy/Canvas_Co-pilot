@@ -1,13 +1,50 @@
 const express = require("express");
 const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
+const { execFile } = require("child_process");
 const pdf = require("pdf-parse");
 const Anthropic = require("@anthropic-ai/sdk").default;
+const textToSpeech = require("@google-cloud/text-to-speech");
 require("dotenv").config();
 
 const app = express();
 const PORT = 3001;
 
-app.use(cors({ origin: "http://localhost:5173" }));
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5175";
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
+  "http://localhost:5177",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
+  "http://127.0.0.1:5176",
+  "http://127.0.0.1:5177",
+  FRONTEND_ORIGIN,
+];
+
+const GENERATED_AUDIO_DIR = path.join(__dirname, "generated", "audio");
+const GENERATED_VIDEO_DIR = path.join(__dirname, "generated", "videos");
+fs.mkdirSync(GENERATED_AUDIO_DIR, { recursive: true });
+fs.mkdirSync(GENERATED_VIDEO_DIR, { recursive: true });
+
+app.use("/audio", express.static(GENERATED_AUDIO_DIR));
+app.use("/videos", express.static(GENERATED_VIDEO_DIR));
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS origin not allowed: ${origin}`));
+      }
+    },
+  })
+);
 app.use(express.json());
 
 const CANVAS_TOKEN = process.env.CANVAS_TOKEN;
@@ -100,6 +137,124 @@ async function downloadCanvasFile(fileUrl) {
 
 // In-memory cache for extracted PDF text (fileId -> text)
 const textCache = new Map();
+
+let ttsClient = null;
+function getTtsClient() {
+  if (!ttsClient) {
+    ttsClient = new textToSpeech.TextToSpeechClient();
+  }
+  return ttsClient;
+}
+
+async function synthesizeSpeech(text, filename) {
+  if (!text || !text.trim()) {
+    throw new Error("No text provided for speech synthesis.");
+  }
+
+  const client = getTtsClient();
+  const request = {
+    input: { text },
+    voice: {
+      languageCode: "en-US",
+      name: "en-US-Wavenet-F",
+      ssmlGender: "FEMALE",
+    },
+    audioConfig: {
+      audioEncoding: "MP3",
+      speakingRate: 1.0,
+      pitch: 0,
+    },
+  };
+
+  const [response] = await client.synthesizeSpeech(request);
+  const outputPath = path.join(GENERATED_AUDIO_DIR, filename);
+  await fs.promises.writeFile(outputPath, response.audioContent, "binary");
+  return outputPath;
+}
+
+function getVideoFilename(topic) {
+  const safeTopic = (topic || "study-video").replace(/[^a-zA-Z0-9-_]/g, "-").slice(0, 80);
+  return `${safeTopic}-${Date.now()}.mp4`;
+}
+
+function runRemotionRender(entryFile, compositionId, props, outputFilename) {
+  return new Promise((resolve, reject) => {
+    const frontendDir = path.join(__dirname, "..", "frontend");
+    const outputPath = path.join(GENERATED_VIDEO_DIR, outputFilename);
+    const args = [
+      "remotion",
+      "render",
+      entryFile,
+      compositionId,
+      outputPath,
+      "--props",
+      JSON.stringify(props),
+      "--overwrite",
+      "--quiet",
+    ];
+
+    const child = execFile("npx", args, {
+      cwd: frontendDir,
+      maxBuffer: 1024 * 1024 * 20,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || stdout || error.message));
+      } else {
+        resolve(outputPath);
+      }
+    });
+
+    child.stdout?.pipe(process.stdout);
+    child.stderr?.pipe(process.stderr);
+  });
+}
+
+function createLocalVideoScript(content = "", topic = "Study Material", style = "medium") {
+  const durationSeconds = style === "short" ? 90 : style === "long" ? 240 : 180;
+  const title = `Study Video: ${topic}`;
+  const sanitized = content.replace(/\s+/g, " ").trim();
+  const sentences = sanitized
+    .split(/[.?!]\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const headline = sentences.slice(0, 2).join(". ") || "Study the key concepts.";
+  const bullets = sentences.slice(1, 4).map((s) => {
+    const text = s.replace(/\.$/, "");
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  });
+
+  while (bullets.length < 3) {
+    bullets.push("Review the main concept.");
+  }
+
+  return {
+    title,
+    duration: durationSeconds,
+    scenes: [
+      {
+        type: "title",
+        heading: topic,
+        subtitle: "Quick review of the most important ideas",
+        durationSeconds: 4,
+      },
+      {
+        type: "content",
+        heading: "Main Points",
+        bullets,
+        narration: headline,
+        durationSeconds: 20,
+      },
+      {
+        type: "summary",
+        heading: "Key Takeaways",
+        bullets: bullets.slice(0, 3),
+        narration: `Remember these core ideas about ${topic}.`,
+        durationSeconds: 10,
+      },
+    ],
+    totalNarration: `${title}. ${headline}`,
+  };
+}
 
 // ── Existing Endpoints ────────────────────────────────────
 
@@ -298,21 +453,21 @@ app.get("/api/module-files", async (req, res) => {
 });
 
 // 7. Extract text from a PDF file
-app.get("/api/file-text", async (req, res) => {
+app.get("/api/file-text", extractTextHandler);
+app.get("/api/extract-text", extractTextHandler);
+
+async function extractTextHandler(req, res) {
   const { fileId, courseId } = req.query;
   if (!fileId || !courseId) {
     return res.status(400).json({ error: "fileId and courseId are required" });
   }
 
-  // Return cached text if available
   if (textCache.has(fileId)) {
     return res.json({ fileId, text: textCache.get(fileId), cached: true });
   }
 
   try {
-    // Get file metadata (includes download URL)
     const file = await canvasRequest(`/courses/${courseId}/files/${fileId}`);
-
     if (!file.url) {
       return res.status(404).json({ error: "File has no download URL" });
     }
@@ -322,15 +477,10 @@ app.get("/api/file-text", async (req, res) => {
       (file.filename || "").toLowerCase().endsWith(".pdf");
 
     if (!isPdf) {
-      return res
-        .status(400)
-        .json({ error: "Only PDF files can be extracted" });
+      return res.status(400).json({ error: "Only PDF files can be extracted" });
     }
 
-    // Download the PDF
     const buffer = await downloadCanvasFile(file.url);
-
-    // Extract text
     let text = "";
     try {
       const pdfData = await pdf(buffer);
@@ -351,21 +501,17 @@ app.get("/api/file-text", async (req, res) => {
       });
     }
 
-    // Cache the extracted text
     textCache.set(fileId, text);
-
     res.json({
       fileId,
       text,
-      pages: text.split(/\f/).length, // form-feed page breaks
+      pages: text.split(/\f/).length,
       chars: text.length,
     });
   } catch (err) {
-    res
-      .status(err.status || 500)
-      .json({ error: `Failed to extract text: ${err.message}` });
+    res.status(err.status || 500).json({ error: `Failed to extract text: ${err.message}` });
   }
-});
+}
 
 // 8. Summarize a single file
 app.post("/api/summarize-file", async (req, res) => {
@@ -534,6 +680,325 @@ ${combined}`,
     res
       .status(500)
       .json({ error: `Module summarization failed: ${err.message}` });
+  }
+});
+
+// ── Web Knowledge & Video Endpoints ──────────────────────
+
+// In-memory cache for web search results
+const webCache = new Map();
+
+// 10. Search the web for supporting knowledge (free sources only)
+app.get("/api/search-web", async (req, res) => {
+  const { topic } = req.query;
+  if (!topic) return res.status(400).json({ error: "topic is required" });
+
+  const cacheKey = topic.toLowerCase().trim();
+  if (webCache.has(cacheKey)) {
+    return res.json({ ...webCache.get(cacheKey), cached: true });
+  }
+
+  const results = [];
+
+  // 1. Wikipedia summary (primary free source)
+  try {
+    const wikiRes = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topic)}`
+    );
+    if (wikiRes.ok) {
+      const wiki = await wikiRes.json();
+      if (wiki.extract && wiki.type !== "disambiguation") {
+        results.push({
+          source: "Wikipedia",
+          title: wiki.title,
+          summary: wiki.extract,
+          url: wiki.content_urls?.desktop?.page || `https://en.wikipedia.org/wiki/${encodeURIComponent(topic)}`,
+          type: "encyclopedia",
+        });
+      }
+    }
+  } catch { /* non-critical */ }
+
+  // 2. Wikipedia search for related articles
+  try {
+    const searchRes = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(topic)}&limit=3&format=json`
+    );
+    if (searchRes.ok) {
+      const [, titles, , urls] = await searchRes.json();
+      for (let i = 0; i < titles.length; i++) {
+        if (results.find((r) => r.title === titles[i])) continue;
+        try {
+          const summRes = await fetch(
+            `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titles[i])}`
+          );
+          if (summRes.ok) {
+            const data = await summRes.json();
+            if (data.extract && data.type !== "disambiguation") {
+              results.push({
+                source: "Wikipedia",
+                title: data.title,
+                summary: data.extract,
+                url: urls[i],
+                type: "encyclopedia",
+              });
+            }
+          }
+        } catch { /* skip */ }
+      }
+    }
+  } catch { /* non-critical */ }
+
+  // 3. DuckDuckGo Instant Answer API (free, no key)
+  try {
+    const ddgRes = await fetch(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(topic)}&format=json&no_html=1&skip_disambig=1`
+    );
+    if (ddgRes.ok) {
+      const ddg = await ddgRes.json();
+      if (ddg.Abstract) {
+        results.push({
+          source: ddg.AbstractSource || "DuckDuckGo",
+          title: ddg.Heading || topic,
+          summary: ddg.Abstract,
+          url: ddg.AbstractURL || "",
+          type: "reference",
+        });
+      }
+      if (ddg.RelatedTopics) {
+        for (const rt of ddg.RelatedTopics.slice(0, 3)) {
+          if (rt.Text) {
+            results.push({
+              source: "DuckDuckGo",
+              title: rt.FirstURL?.split("/").pop()?.replace(/_/g, " ") || "Related",
+              summary: rt.Text,
+              url: rt.FirstURL || "",
+              type: "related",
+            });
+          }
+        }
+      }
+    }
+  } catch { /* non-critical */ }
+
+  const response = { topic, results, resultCount: results.length };
+  webCache.set(cacheKey, response);
+  res.json(response);
+});
+
+// 11. Enrich a topic by combining Canvas content with web knowledge
+app.post("/api/enrich-topic", async (req, res) => {
+  const { canvasSummary, webResults, topic, moduleName } = req.body;
+  if (!canvasSummary && !webResults) {
+    return res.status(400).json({ error: "canvasSummary or webResults required" });
+  }
+
+  try {
+    const webContext = (webResults || [])
+      .map((r) => `[${r.source}] ${r.title}: ${r.summary}`)
+      .join("\n\n");
+
+    const ai = getAnthropic();
+    const message = await ai.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2500,
+      messages: [
+        {
+          role: "user",
+          content: `You are a study tutor. Combine the following Canvas course material with online knowledge to create an enriched study guide for "${topic || moduleName || "this topic"}".
+
+## Canvas Course Material (from professor):
+${canvasSummary || "No Canvas summary available."}
+
+## Online Knowledge (from the web):
+${webContext || "No additional web sources found."}
+
+Create an enriched study guide with:
+1. **Enhanced Summary** (combine Canvas + web knowledge, 4-6 sentences)
+2. **Key Concepts Explained** (explain each in beginner-friendly terms, max 8)
+3. **Important Definitions** (with clear, simple explanations)
+4. **Likely Exam Topics** (what a professor would test, max 7)
+5. **Study Notes** (concise takeaways for review)
+6. **Additional Context from the Web** (what the web sources add beyond the lecture)
+
+For each point, add a source label: [Canvas] or [Web] or [Combined].
+Use markdown formatting. Be concise and student-friendly.`,
+        },
+      ],
+    });
+
+    const enrichedSummary = message.content[0]?.text || "No enrichment generated.";
+    res.json({ topic, enrichedSummary });
+  } catch (err) {
+    res.status(500).json({ error: `Enrichment failed: ${err.message}` });
+  }
+});
+
+// 12. Generate a video script from enriched content
+app.post("/api/generate-script", async (req, res) => {
+  const { enrichedSummary, topic, moduleName, style } = req.body;
+  if (!enrichedSummary) {
+    return res.status(400).json({ error: "enrichedSummary is required" });
+  }
+
+  const duration =
+    style === "short" ? "1-2 minutes" : style === "long" ? "4-5 minutes" : "2-3 minutes";
+
+  try {
+    const ai = getAnthropic();
+    const message = await ai.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2500,
+      messages: [
+        {
+          role: "user",
+          content: `Create a ${duration} educational video script for "${topic || moduleName || "this topic"}".
+
+Based on this study material:
+${enrichedSummary}
+
+Return ONLY valid JSON (no markdown fences) with this exact structure:
+{
+  "title": "Video title",
+  "duration": "${duration}",
+  "scenes": [
+    {
+      "type": "title",
+      "heading": "Main title",
+      "subtitle": "Short subtitle",
+      "durationSeconds": 4
+    },
+    {
+      "type": "content",
+      "heading": "Section heading",
+      "bullets": ["Point 1", "Point 2", "Point 3"],
+      "narration": "What to say during this scene",
+      "durationSeconds": 15
+    },
+    {
+      "type": "definition",
+      "term": "Key Term",
+      "definition": "Clear explanation",
+      "narration": "What to say",
+      "durationSeconds": 10
+    },
+    {
+      "type": "summary",
+      "heading": "Key Takeaways",
+      "bullets": ["Takeaway 1", "Takeaway 2"],
+      "narration": "Closing narration",
+      "durationSeconds": 10
+    }
+  ],
+  "totalNarration": "Full narration script for the entire video"
+}
+
+Include 4-7 scenes total. Keep on-screen text concise (max 8 words per bullet). Make narration natural and educational.`,
+        },
+      ],
+    });
+
+    let scriptText = message.content[0]?.text || "";
+    // Strip markdown fences if present
+    scriptText = scriptText
+      .replace(/^```json?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+
+    let script;
+    try {
+      script = JSON.parse(scriptText);
+    } catch {
+      return res.json({
+        topic,
+        script: null,
+        rawScript: scriptText,
+        error: "Script generation returned non-JSON. Raw text included.",
+      });
+    }
+
+    res.json({ topic, script });
+  } catch (err) {
+    console.warn("Anthropic script generation failed, using local fallback:", err.message);
+    const fallbackScript = createLocalVideoScript(
+      enrichedSummary,
+      topic || moduleName || "Study Material",
+      style
+    );
+    res.json({ topic, script: fallbackScript, fallback: true });
+  }
+});
+
+// 12. Generate narration audio via Google Cloud TTS
+app.post("/api/generate-audio", async (req, res) => {
+  const { text, filename } = req.body;
+  if (!text) {
+    return res.status(400).json({ error: "text is required for audio generation" });
+  }
+
+  try {
+    const safeFilename = (filename || `tts-${Date.now()}`).replace(/[^a-zA-Z0-9-_]/g, "-");
+    const fileName = `${safeFilename}.mp3`;
+    await synthesizeSpeech(text, fileName);
+    const fullAudioUrl = `${req.protocol}://${req.get("host")}/audio/${fileName}`;
+    res.json({ audioUrl: fullAudioUrl, filename: fileName });
+  } catch (err) {
+    res.status(500).json({ error: `Audio generation failed: ${err.message}` });
+  }
+});
+
+// 13. Generate Remotion-ready video scene data with frame calculations
+app.post("/api/generate-video", async (req, res) => {
+  const { script, topic, audioUrl, renderFile } = req.body;
+  if (!script || !script.scenes) {
+    return res.status(400).json({ error: "script with scenes is required" });
+  }
+
+  const FPS = 30;
+  let currentFrame = 0;
+  const scenes = script.scenes.map((scene, index) => {
+    const durationFrames = (scene.durationSeconds || 10) * FPS;
+    const sceneData = {
+      ...scene,
+      id: `scene-${index}`,
+      startFrame: currentFrame,
+      durationFrames,
+      durationSeconds: scene.durationSeconds || 10,
+    };
+    currentFrame += durationFrames;
+    return sceneData;
+  });
+
+  const videoData = {
+    topic,
+    fps: FPS,
+    totalDurationFrames: currentFrame,
+    totalDurationSeconds: currentFrame / FPS,
+    scenes,
+    narration: script.totalNarration || "",
+    audioUrl: audioUrl || null,
+  };
+
+  if (!renderFile) {
+    return res.json(videoData);
+  }
+
+  try {
+    if (!audioUrl) {
+      return res.status(400).json({ error: "audioUrl is required to render a video file" });
+    }
+
+    const outputFilename = getVideoFilename(topic);
+    const entryFile = path.join("src", "VideoComposition.jsx");
+    await runRemotionRender(entryFile, "StudyVideo", { videoData, audioUrl }, outputFilename);
+
+    const fullVideoUrl = `${req.protocol}://${req.get("host")}/videos/${outputFilename}`;
+    res.json({
+      ...videoData,
+      videoUrl: fullVideoUrl,
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Video render failed: ${err.message}` });
   }
 });
 

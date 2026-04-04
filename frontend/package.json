@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@remotion/player": "^4.0.445",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.445"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

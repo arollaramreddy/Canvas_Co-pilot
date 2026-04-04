@@ -8,10 +8,15 @@
     "dev": "node --watch server.js"
   },
   "dependencies": {
+    "@remotion/bundler": "^4.0.276",
+    "@remotion/renderer": "^4.0.276",
     "@anthropic-ai/sdk": "^0.82.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "pdf-parse": "^1.1.1"
+    "pdf-parse": "^1.1.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.276"
   }
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 
-const API = "http://localhost:3001/api";
+const API = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001/api";
 
 const DEFAULT_SETTINGS = {
   previewLength: 2000,   // chars shown in extracted text preview
@@ -199,6 +199,45 @@ function getCourseIdFromPath(pathname) {
   return match ? Number(match[1]) : null;
 }
 
+function convertStoryboardToLesson(storyboard, fallbackTitle) {
+  if (!storyboard?.scenes?.length) return null;
+  const totalSeconds = storyboard.scenes.reduce(
+    (sum, scene) => sum + (scene.durationSeconds || 8),
+    0
+  );
+  return {
+    title: storyboard.title || fallbackTitle || "Lesson Preview",
+    subject: storyboard.mode === "detailed" ? "Detailed lesson" : "Quick lesson",
+    estimated_minutes: Math.max(1, Math.round(totalSeconds / 60)),
+    slides: [
+      {
+        id: "title",
+        type: "title",
+        heading: storyboard.title || fallbackTitle || "Lesson Preview",
+        subheading: storyboard.summary || "Scene preview generated from this PDF",
+        narration: storyboard.summary || "Previewing the generated lesson scenes.",
+      },
+      ...storyboard.scenes.map((scene, index) => ({
+        id: scene.id || index + 1,
+        type: index % 3 === 1 ? "definition" : index % 3 === 2 ? "example" : "concept",
+        heading: scene.title,
+        term: scene.title,
+        definition: scene.onScreenText?.[0],
+        example: scene.onScreenText?.[1],
+        bullets: scene.onScreenText || [],
+        narration: scene.narration,
+      })),
+      {
+        id: "summary",
+        type: "summary",
+        heading: "Scene Takeaways",
+        bullets: storyboard.scenes.map((scene) => scene.title).slice(0, 4),
+        narration: storyboard.summary || "These scenes form the final lesson video.",
+      },
+    ],
+  };
+}
+
 // Returns deadline urgency info, or null if > 7 days away
 function deadlineStatus(dateStr) {
   if (!dateStr) return null;
@@ -297,37 +336,147 @@ function App() {
   const agentMessagesEndRef = useRef(null);
 
   // Lesson / video player state
-  const [lessons, setLessons] = useState({});           // fileId -> lesson object
+  const [videoJobs, setVideoJobs] = useState({}); // fileId -> pipeline state
+  const [videoModes, setVideoModes] = useState({}); // fileId -> quick | detailed
   const [generatingLesson, setGeneratingLesson] = useState({}); // fileId -> bool
-  const [openLesson, setOpenLesson] = useState(null);   // lesson being played
+  const [openLesson, setOpenLesson] = useState(null); // scene preview player
 
-  async function handleGenerateLesson(file) {
+  function updateVideoJob(fileId, updater) {
+    setVideoJobs((prev) => {
+      const current = prev[fileId] || {};
+      const next =
+        typeof updater === "function" ? updater(current) : { ...current, ...updater };
+      return { ...prev, [fileId]: next };
+    });
+  }
+
+  function pushVideoStep(fileId, message) {
+    updateVideoJob(fileId, (current) => ({
+      ...current,
+      status: message,
+      steps: [...(current.steps || []), message],
+    }));
+  }
+
+  function getVideoMode(fileId) {
+    return videoModes[fileId] || "quick";
+  }
+
+  async function handleGenerateLesson(file, options = {}) {
     const fileId = String(file.id);
+    const mode = getVideoMode(fileId);
     setGeneratingLesson((p) => ({ ...p, [fileId]: true }));
+    updateVideoJob(fileId, {
+      loading: true,
+      error: "",
+      status: "Generating video...",
+      steps: ["Generating video..."],
+      mode,
+      warnings: [],
+    });
+
     try {
-      // Get text from cache or extract first
+      pushVideoStep(fileId, "Extracting or reusing PDF text...");
       let text = "";
       if (extractedTexts[fileId]?.text) {
         text = extractedTexts[fileId].text;
       } else {
         const res = await fetch(`${API}/file-text?fileId=${fileId}&courseId=${selectedCourse.id}`);
         const data = await res.json();
+        if (data.error) throw new Error(data.error);
         text = data.text || "";
-        if (text) setExtractedTexts((p) => ({ ...p, [fileId]: { text, chars: text.length } }));
+        if (text) {
+          setExtractedTexts((p) => ({
+            ...p,
+            [fileId]: {
+              text,
+              chars: data.chars || text.length,
+              pages: data.pages,
+              warning: data.warning || null,
+            },
+          }));
+        }
       }
       if (!text) throw new Error("No extractable text in this PDF");
 
-      const res = await fetch(`${API}/generate-lesson`, {
+      pushVideoStep(fileId, "Generating a scene-based lesson script...");
+      const scriptRes = await fetch(`${API}/generate-script`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, title: file.display_name }),
+        body: JSON.stringify({
+          fileId,
+          courseId: selectedCourse.id,
+          title: file.display_name,
+          text,
+          mode,
+          enrichWeb: true,
+        }),
       });
-      const lesson = await res.json();
-      if (lesson.error) throw new Error(lesson.error);
-      setLessons((p) => ({ ...p, [fileId]: lesson }));
-      setOpenLesson(lesson);
+      const scriptData = await scriptRes.json();
+      if (scriptData.error) throw new Error(scriptData.error);
+
+      const previewLesson = convertStoryboardToLesson(scriptData.storyboard, file.display_name);
+      updateVideoJob(fileId, (current) => ({
+        ...current,
+        storyboard: scriptData.storyboard,
+        scriptUrl: scriptData.scriptUrl,
+        source: scriptData.source,
+        fallbackUsed: scriptData.fallbackUsed,
+        warnings: [scriptData.warning, ...(scriptData.warnings || [])].filter(Boolean),
+        webContext: scriptData.webContext || [],
+        scenePreview:
+          scriptData.storyboard?.scenes?.map((scene) => ({
+            id: scene.id,
+            title: scene.title,
+            keyword: scene.keyword,
+            caption: scene.captions,
+            hasBackgroundVideo: false,
+            hasAudio: false,
+          })) || [],
+        previewLesson,
+      }));
+
+      pushVideoStep(fileId, "Fetching Pexels clips, generating narration, and rendering MP4...");
+      const videoRes = await fetch(`${API}/generate-video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileId,
+          courseId: selectedCourse.id,
+          title: file.display_name,
+          text,
+          storyboard: scriptData.storyboard,
+          mode,
+          enrichWeb: true,
+          force: options.force || false,
+        }),
+      });
+      const videoData = await videoRes.json();
+      if (videoData.error) throw new Error(videoData.error);
+
+      updateVideoJob(fileId, (current) => ({
+        ...current,
+        loading: false,
+        status: "Video ready",
+        storyboard: videoData.storyboard,
+        scriptUrl: videoData.scriptUrl || current.scriptUrl,
+        videoUrl: videoData.videoUrl,
+        downloadUrl: videoData.downloadUrl,
+        source: videoData.source || current.source,
+        fallbackUsed: videoData.fallbackUsed || current.fallbackUsed,
+        warnings: videoData.warnings || current.warnings || [],
+        scenePreview: videoData.scenePreview || current.scenePreview || [],
+        previewLesson:
+          convertStoryboardToLesson(videoData.storyboard, file.display_name) ||
+          current.previewLesson,
+      }));
     } catch (err) {
-      alert(`Video generation failed: ${err.message}`);
+      updateVideoJob(fileId, (current) => ({
+        ...current,
+        loading: false,
+        error: err.message,
+        status: "Video generation failed",
+      }));
     } finally {
       setGeneratingLesson((p) => ({ ...p, [fileId]: false }));
     }
@@ -369,6 +518,10 @@ function App() {
     setSummarizing({});
     setSummarizingModule(false);
     setExtractedTexts({});
+    setVideoJobs({});
+    setVideoModes({});
+    setGeneratingLesson({});
+    setOpenLesson(null);
     setSearchQuery("");
     setLoadingModules(false);
     setLoadingFiles(false);
@@ -443,6 +596,10 @@ function App() {
     setSummarizing({});
     setSummarizingModule(false);
     setExtractedTexts({});
+    setVideoJobs({});
+    setVideoModes({});
+    setGeneratingLesson({});
+    setOpenLesson(null);
     setSearchQuery("");
     setLoading(true);
     setLoadingModules(true);
@@ -783,6 +940,135 @@ function App() {
       if (!line.trim()) return <br key={i} />;
       return <p key={i} className="md-p">{renderInline(line)}</p>;
     });
+  }
+
+  function renderVideoJobPanel(file) {
+    const job = videoJobs[String(file.id)];
+    if (!job) return null;
+
+    return (
+      <div className="video-panel">
+        <div className="video-panel-header">
+          <div>
+            <h4>Lesson Video</h4>
+            <p className="video-status-line">
+              <span className={`video-status-badge ${job.error ? "error" : job.loading ? "loading" : "ready"}`}>
+                {job.error ? "Failed" : job.loading ? "Generating" : "Ready"}
+              </span>
+              <span>{job.status || "Preparing video lesson"}</span>
+            </p>
+          </div>
+          <div className="video-panel-actions">
+            <span className="video-mode-pill">
+              {job.mode === "detailed" ? "Detailed lesson" : "Quick 2-minute"}
+            </span>
+            {job.previewLesson && (
+              <button
+                className="action-btn sm"
+                onClick={() => setOpenLesson(job.previewLesson)}
+              >
+                Preview Scenes
+              </button>
+            )}
+            <button
+              className="action-btn sm"
+              onClick={() => handleGenerateLesson(file, { force: true })}
+              disabled={job.loading}
+            >
+              {job.error ? "Retry" : "Regenerate"}
+            </button>
+            {job.scriptUrl && (
+              <a className="action-btn sm" href={job.scriptUrl} target="_blank" rel="noreferrer">
+                Download Script
+              </a>
+            )}
+            {job.downloadUrl && (
+              <a className="action-btn sm primary" href={job.downloadUrl} target="_blank" rel="noreferrer">
+                Download Video
+              </a>
+            )}
+          </div>
+        </div>
+
+        {job.fallbackUsed && (
+          <p className="video-note">
+            Claude was unavailable, so this lesson used the free/local fallback path.
+          </p>
+        )}
+
+        {job.steps?.length > 0 && (
+          <div className="video-steps">
+            {job.steps.map((step, index) => (
+              <div key={`${step}-${index}`} className="video-step">
+                <span className="video-step-dot" />
+                <span>{step}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {job.error && <div className="video-error">{job.error}</div>}
+
+        {job.scenePreview?.length > 0 && (
+          <div className="scene-preview-grid">
+            {job.scenePreview.map((scene) => (
+              <div key={scene.id} className="scene-preview-card">
+                <div className="scene-preview-top">
+                  <span className="scene-preview-id">Scene {scene.id}</span>
+                  <span className="scene-preview-keyword">{scene.keyword}</span>
+                </div>
+                <strong>{scene.title}</strong>
+                <p>{scene.caption}</p>
+                <div className="scene-preview-meta">
+                  <span>{scene.hasBackgroundVideo ? "Pexels clip" : "Animated fallback"}</span>
+                  <span>{scene.hasAudio ? "Narrated" : "Captions only"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {job.webContext?.length > 0 && (
+          <div className="web-context-panel">
+            <h5>Public web enrichment</h5>
+            {job.webContext.map((item) => (
+              <p key={item.url}>
+                <strong>{item.title}:</strong> {item.summary}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {job.videoUrl && (
+          <div className="video-player-shell">
+            <video className="generated-video-player" src={job.videoUrl} controls preload="metadata" />
+          </div>
+        )}
+
+        {job.storyboard?.scenes?.length > 0 && (
+          <details className="script-preview">
+            <summary>Video script preview</summary>
+            <div className="script-preview-body">
+              <p className="script-summary">{job.storyboard.summary}</p>
+              {job.storyboard.scenes.map((scene) => (
+                <div key={scene.id} className="script-scene">
+                  <strong>{scene.title}</strong>
+                  <p>{scene.narration}</p>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+
+        {job.warnings?.length > 0 && (
+          <div className="video-warnings">
+            {job.warnings.map((warning, index) => (
+              <p key={`${warning}-${index}`}>{warning}</p>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   const filteredFiles = searchQuery
@@ -1310,6 +1596,26 @@ function App() {
                       </div>
                       {file.is_pdf && file.type === "File" && (
                         <div className="file-actions">
+                          <div className="video-mode-toggle">
+                            <button
+                              className={`mode-chip ${getVideoMode(String(file.id)) === "quick" ? "active" : ""}`}
+                              onClick={() =>
+                                setVideoModes((prev) => ({ ...prev, [String(file.id)]: "quick" }))
+                              }
+                              type="button"
+                            >
+                              Quick
+                            </button>
+                            <button
+                              className={`mode-chip ${getVideoMode(String(file.id)) === "detailed" ? "active" : ""}`}
+                              onClick={() =>
+                                setVideoModes((prev) => ({ ...prev, [String(file.id)]: "detailed" }))
+                              }
+                              type="button"
+                            >
+                              Detailed
+                            </button>
+                          </div>
                           <button
                             className="action-btn sm"
                             onClick={() => handleExtractText(file)}
@@ -1329,16 +1635,15 @@ function App() {
                           </button>
                           <button
                             className="action-btn sm video-btn"
-                            onClick={() => {
-                              if (lessons[String(file.id)]) { setOpenLesson(lessons[String(file.id)]); }
-                              else { handleGenerateLesson(file); }
-                            }}
+                            onClick={() => handleGenerateLesson(file)}
                             disabled={generatingLesson[String(file.id)]}
                             title="Generate video lesson from this PDF"
                           >
                             {generatingLesson[String(file.id)]
-                              ? <><span className="spinner-sm" /> Building...</>
-                              : lessons[String(file.id)] ? "▶ Play Lesson" : "▶ Video Lesson"}
+                              ? <><span className="spinner-sm" /> Generating video...</>
+                              : videoJobs[String(file.id)]?.error ? "↻ Retry Video"
+                              : videoJobs[String(file.id)]?.videoUrl ? "↻ Regenerate Video"
+                              : "▶ Video Lesson"}
                           </button>
                         </div>
                       )}
@@ -1378,6 +1683,7 @@ function App() {
                         <div className="summary-content">{renderMarkdown(summaries[file.id])}</div>
                       </div>
                     )}
+                    {renderVideoJobPanel(file)}
                     {file.error && <p className="muted">{file.error}</p>}
                   </div>
                 ))}
@@ -1461,6 +1767,26 @@ function App() {
                         </div>
                         {isPdf && (
                           <div className="file-actions">
+                            <div className="video-mode-toggle">
+                              <button
+                                className={`mode-chip ${getVideoMode(String(file.id)) === "quick" ? "active" : ""}`}
+                                onClick={() =>
+                                  setVideoModes((prev) => ({ ...prev, [String(file.id)]: "quick" }))
+                                }
+                                type="button"
+                              >
+                                Quick
+                              </button>
+                              <button
+                                className={`mode-chip ${getVideoMode(String(file.id)) === "detailed" ? "active" : ""}`}
+                                onClick={() =>
+                                  setVideoModes((prev) => ({ ...prev, [String(file.id)]: "detailed" }))
+                                }
+                                type="button"
+                              >
+                                Detailed
+                              </button>
+                            </div>
                             <button
                               className="action-btn sm"
                               onClick={() => handleExtractText({ id: file.id, display_name: file.display_name })}
@@ -1480,17 +1806,15 @@ function App() {
                             </button>
                             <button
                               className="action-btn sm video-btn"
-                              onClick={() => {
-                                const fid = String(file.id);
-                                if (lessons[fid]) { setOpenLesson(lessons[fid]); }
-                                else { handleGenerateLesson({ id: file.id, display_name: file.display_name }); }
-                              }}
+                              onClick={() => handleGenerateLesson({ id: file.id, display_name: file.display_name })}
                               disabled={generatingLesson[String(file.id)]}
                               title="Generate video lesson from this PDF"
                             >
                               {generatingLesson[String(file.id)]
-                                ? <><span className="spinner-sm" /> Building...</>
-                                : lessons[String(file.id)] ? "▶ Play Lesson" : "▶ Video Lesson"}
+                                ? <><span className="spinner-sm" /> Generating video...</>
+                                : videoJobs[String(file.id)]?.error ? "↻ Retry Video"
+                                : videoJobs[String(file.id)]?.videoUrl ? "↻ Regenerate Video"
+                                : "▶ Video Lesson"}
                             </button>
                           </div>
                         )}
@@ -1523,6 +1847,7 @@ function App() {
                           <div className="summary-content">{renderMarkdown(summaries[file.id])}</div>
                         </div>
                       )}
+                      {renderVideoJobPanel({ id: file.id, display_name: file.display_name })}
                     </div>
                   );
                 })}
@@ -1532,7 +1857,7 @@ function App() {
         )}
 
         <footer>
-          <p>Canvas Study Assistant · AI summaries powered by Claude · Arizona State University</p>
+          <p>Canvas Study Assistant · Canvas PDFs, AI summaries, and free-fallback lesson videos · Arizona State University</p>
         </footer>
       </main>
 

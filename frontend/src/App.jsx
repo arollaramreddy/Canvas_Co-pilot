@@ -17,7 +17,7 @@ import ManualStudentInteractionView from "./manual/ManualStudentInteractionView"
 const API = getApiBase();
 
 const TABS = [
-  { id: "autonomous", label: "Autonomous agents working" },
+  { id: "autonomous", label: "Autonomous Workflow Engine" },
   { id: studyPlanConfig.id, label: studyPlanConfig.label },
   { id: quizConfig.id, label: quizConfig.label },
   { id: "manual", label: "Manual student interaction" },
@@ -25,15 +25,15 @@ const TABS = [
 
 const TAB_META = {
   autonomous: {
-    eyebrow: "Live orchestration",
+    eyebrow: "Stateful orchestration",
     description: "Inbox, materials, and grades in one view.",
   },
   [studyPlanConfig.id]: {
-    eyebrow: "Planner",
+    eyebrow: "AI Dynamic Architect",
     description: "Build and refine study plans.",
   },
   [quizConfig.id]: {
-    eyebrow: "Assessment",
+    eyebrow: "Adaptive Assessment",
     description: "Generate and review quizzes.",
   },
   manual: {
@@ -46,7 +46,7 @@ const AUTONOMOUS_ROUTES = [
   { id: "overview", label: "Overview", path: "/" },
   { id: "inbox", label: "Inbox", path: "/inbox" },
   { id: "materials", label: "Materials", path: "/materials" },
-  { id: "scores", label: "Scores", path: "/scores" },
+  { id: "Performance Metrics", label: "Scores", path: "/scores" },
   { id: "practice", label: "Quizzes & flashcards", path: "/practice" },
   { id: "studyPlanner", label: "Study planner", path: "/study-planner" },
   { id: "settings", label: "Settings", path: "/settings" },
@@ -808,7 +808,7 @@ function App() {
 
   useEffect(() => {
     setPanelMotionKey((current) => current + 1);
-  }, [activeTab, autonomousRoute, pathname]);
+  }, [activeTab, autonomousRoute]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1050,7 +1050,22 @@ function App() {
           data-motion="hero"
         >
           <div className="workspace-header-copy" data-motion="copy">
-            <span className="brand-tag">Canvas Copilot</span>
+            <div className="brand-hero-row">
+              <span className="brand-tag">Canvas Copilot</span>
+              <div className="brand-bot" aria-hidden="true">
+                <div className="brand-bot-antenna" />
+                <div className="brand-bot-head">
+                  <span className="brand-bot-eye" />
+                  <span className="brand-bot-eye" />
+                  <span className="brand-bot-mouth" />
+                </div>
+                <div className="brand-bot-body">
+                  <span className="brand-bot-arm brand-bot-arm-left" />
+                  <span className="brand-bot-core" />
+                  <span className="brand-bot-arm brand-bot-arm-right" />
+                </div>
+              </div>
+            </div>
             <h1>Welcome, {user.name}</h1>
           </div>
           <div className="workspace-header-visual" aria-hidden="true" data-motion="visual">

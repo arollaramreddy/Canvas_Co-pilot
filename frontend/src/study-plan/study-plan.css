@@ -111,6 +111,17 @@
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
+.feature-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.feature-field select option {
+  background: #ffffff;
+  color: #142133;
+}
+
 .feature-field input:focus,
 .feature-field select:focus {
   outline: none;
@@ -557,6 +568,11 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+:root:not([data-theme="light"]) .feature-field select option {
+  background: #14161d;
+  color: #f5f7ff;
+}
+
 .feature-chip,
 .feature-output-meta span {
   background: rgba(255, 255, 255, 0.04);
@@ -673,6 +689,11 @@
   background: rgba(255, 255, 255, 0.98);
   color: var(--text-surface-field);
   border-color: #d5dde7;
+}
+
+:root[data-theme="light"] .feature-field select option {
+  background: #ffffff;
+  color: var(--text-surface-field);
 }
 
 :root[data-theme="light"] .feature-chip.active {

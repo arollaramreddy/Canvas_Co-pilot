@@ -2,6 +2,439 @@
   "quizzesByUser": {
     "1142825": [
       {
+        "id": "1142825-1775392097929-a4e067",
+        "userId": "1142825",
+        "courseId": "205911",
+        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "scopeType": "study_plan_module",
+        "moduleId": "2313510",
+        "moduleName": "Module 3: Populating Tables",
+        "title": "Module 3: Populating Tables Quiz",
+        "selectedModuleIds": [
+          "2313510"
+        ],
+        "selectedFileIds": [],
+        "description": "Test your understanding of techniques and concepts related to populating tables in advanced database management systems.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "Which of the following is the primary method for inserting data into a table in SQL?",
+            "options": [
+              "CREATE TABLE statement",
+              "INSERT INTO statement",
+              "SELECT statement",
+              "DROP TABLE statement"
+            ],
+            "answerIndex": 1,
+            "explanation": "The INSERT INTO statement is the standard SQL command used to add new rows of data to an existing table, as shown in the 'Populating Tables' sample code."
+          },
+          {
+            "id": "q-2",
+            "prompt": "When bulk populating a table, what is a common advantage of using a single INSERT statement with multiple rows over many individual INSERT statements?",
+            "options": [
+              "It automatically validates the data types",
+              "It reduces transaction overhead and improves performance",
+              "It requires less disk space",
+              "It prevents duplicates automatically"
+            ],
+            "answerIndex": 1,
+            "explanation": "Using a single INSERT with multiple rows reduces transaction overhead by committing once, enhancing performance, which is a common best practice in populating tables."
+          },
+          {
+            "id": "q-3",
+            "prompt": "In the context of populating tables, what is a commonly recommended practice when inserting data to ensure data integrity?",
+            "options": [
+              "Disable all constraints before inserting data",
+              "Use transactions to group multiple insertions",
+              "Insert data without specifying column names to save typing",
+              "Use SELECT * to copy data between tables"
+            ],
+            "answerIndex": 1,
+            "explanation": "Grouping multiple insertions within transactions ensures either all data is committed or none, maintaining data integrity during population as suggested in assignment guidelines."
+          },
+          {
+            "id": "q-4",
+            "prompt": "Which option best describes the use of the SELECT statement in populating tables?",
+            "options": [
+              "It can be used within an INSERT to populate data from another table",
+              "It is used exclusively for querying data, not inserting",
+              "It automatically populates tables with default values",
+              "It creates new tables from query results"
+            ],
+            "answerIndex": 0,
+            "explanation": "The INSERT INTO ... SELECT statement allows populating a table by copying data from another table, an efficient technique covered in example code."
+          },
+          {
+            "id": "q-5",
+            "prompt": "What is an important consideration when writing sample code to populate tables in assignments for this course?",
+            "options": [
+              "Use dummy data with clear structure and comments",
+              "Avoid specifying column names in INSERT statements",
+              "Write code without transaction control for simplicity",
+              "Use only single row insert statements"
+            ],
+            "answerIndex": 0,
+            "explanation": "Writing clear, well-structured sample code with comments and dummy data helps in understanding and maintaining the code, as emphasized in the assignment and sample code materials."
+          },
+          {
+            "id": "q-6",
+            "prompt": "Why might you choose to disable indexes before bulk inserting data into a table during population?",
+            "options": [
+              "Because indexes improve insertion speed",
+              "To avoid index maintenance overhead during bulk load",
+              "Because disabling indexes prevents duplicate rows",
+              "Disabling indexes is required for all insertions"
+            ],
+            "answerIndex": 1,
+            "explanation": "Disabling indexes temporarily during bulk inserts avoids the overhead of updating indexes for each row, thereby improving load performance, a strategy sometimes used in advanced population scenarios."
+          }
+        ],
+        "createdAt": "2026-04-05T12:28:17.929Z",
+        "updatedAt": "2026-04-05T12:28:17.929Z",
+        "taken": false,
+        "lastAttempt": null
+      },
+      {
+        "id": "1142825-1775392097299-e43844",
+        "userId": "1142825",
+        "courseId": "205911",
+        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "scopeType": "study_plan_module",
+        "moduleId": "2313512",
+        "moduleName": "Module 5: Scripting",
+        "title": "Module 5: Scripting Quiz",
+        "selectedModuleIds": [
+          "2313512"
+        ],
+        "selectedFileIds": [],
+        "description": "Test your understanding of scripting concepts and sample code covered in Module 5.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "What is the primary purpose of scripting in advanced database management systems as discussed in this module?",
+            "options": [
+              "To design database schemas",
+              "To automate routine database tasks",
+              "To create user interfaces",
+              "To perform hardware diagnostics"
+            ],
+            "answerIndex": 1,
+            "explanation": "Scripting in database management focuses on automating routine tasks such as backups, data import/export, and maintenance, as outlined in the module material."
+          },
+          {
+            "id": "q-2",
+            "prompt": "Which scripting language feature is emphasized in the sample code provided in the module to handle conditional logic?",
+            "options": [
+              "For loops",
+              "If-else statements",
+              "Switch-case statements",
+              "Try-catch blocks"
+            ],
+            "answerIndex": 1,
+            "explanation": "The sample code highlights using if-else statements for implementing conditional logic, allowing scripts to execute different commands based on certain criteria."
+          },
+          {
+            "id": "q-3",
+            "prompt": "According to the scripting assignment guidelines, what is a critical aspect when writing scripts for database automation?",
+            "options": [
+              "Minimizing user input",
+              "Ensuring the script runs on multiple database platforms",
+              "Writing detailed comments and documentation",
+              "Maximizing the use of global variables"
+            ],
+            "answerIndex": 2,
+            "explanation": "The assignment stresses the importance of writing clear comments and documentation to maintain script clarity and ease future maintenance."
+          },
+          {
+            "id": "q-4",
+            "prompt": "Based on the module content, what is the recommended practice to handle errors in scripting for database operations?",
+            "options": [
+              "Ignoring errors to speed up execution",
+              "Logging errors and implementing exception handling",
+              "Restarting the database server automatically",
+              "Using nested loops to isolate errors"
+            ],
+            "answerIndex": 1,
+            "explanation": "The module recommends logging errors and using proper exception handling to ensure robustness and easier debugging of scripts."
+          },
+          {
+            "id": "q-5",
+            "prompt": "In the sample scripting code, which method is demonstrated for passing parameters to the script?",
+            "options": [
+              "Reading from a configuration file",
+              "Using command-line arguments",
+              "Hardcoding values within the script",
+              "Using environment variables"
+            ],
+            "answerIndex": 1,
+            "explanation": "The sample code showcases passing parameters via command-line arguments to allow flexible and reusable script execution."
+          },
+          {
+            "id": "q-6",
+            "prompt": "What is one advantage of scripting emphasized in the Module 5 learning materials over manual database management?",
+            "options": [
+              "Scripts require no technical knowledge",
+              "Scripts can execute tasks faster and consistently",
+              "Scripts automatically optimize database queries",
+              "Scripts eliminate the need for database backups"
+            ],
+            "answerIndex": 1,
+            "explanation": "The learning materials highlight that scripts enable faster execution of repetitive tasks with consistency, reducing human error."
+          }
+        ],
+        "createdAt": "2026-04-05T12:28:17.299Z",
+        "updatedAt": "2026-04-05T12:28:17.299Z",
+        "taken": false,
+        "lastAttempt": null
+      },
+      {
+        "id": "1142825-1775391705416-c2f218",
+        "userId": "1142825",
+        "courseId": "212510",
+        "courseName": "DSE 501: Statistics for Data Analysts (2025 Spring C)",
+        "scopeType": "manual",
+        "moduleId": null,
+        "moduleName": null,
+        "title": "DSE 501: Statistics for Data Analysts (2025 Spring C) Custom Quiz",
+        "selectedModuleIds": [
+          "2383266"
+        ],
+        "selectedFileIds": [],
+        "description": "Test your understanding of fundamental concepts in probability, random variables, and distributions.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "Which of the following statements correctly distinguishes mutually exclusive events from independent events?",
+            "options": [
+              "Mutually exclusive events always satisfy P(A|B) = P(A), while independent events satisfy A ∩ B = ∅.",
+              "Mutually exclusive events have no intersection meaning A ∩ B = ∅, whereas independence means P(A|B) = P(A).",
+              "Independence means the events have no intersection, and mutually exclusive means P(A|B) = P(A).",
+              "Mutually exclusive and independent events are always the same."
+            ],
+            "answerIndex": 1,
+            "explanation": "Mutually exclusive events have no intersection (A ∩ B = ∅), while independent events satisfy that the conditional probability is equal to the marginal (P(A|B) = P(A))."
+          },
+          {
+            "id": "q-2",
+            "prompt": "If X is a continuous random variable with PDF f_X(x) and CDF F_X(x), which of the following is true?",
+            "options": [
+              "F_X(x) = P(X ≥ x) and f_X(x) is the derivative of F_X(x) with respect to x.",
+              "F_X(x) = P(X ≤ x) and f_X(x) = d/dx F_X(x).",
+              "P(a ≤ X ≤ b) = F_X(a) - F_X(b) for any a < b.",
+              "For a continuous variable, P(X = x) = 1."
+            ],
+            "answerIndex": 1,
+            "explanation": "By definition, the CDF is F_X(x) = P(X ≤ x) and the PDF is the derivative of the CDF, f_X(x) = d/dx F_X(x). Probability at a single point for continuous variables is zero."
+          },
+          {
+            "id": "q-3",
+            "prompt": "The Law of Total Probability is crucial in Bayesian inference. Which formula correctly expresses this law when {A_i} partitions the sample space?",
+            "options": [
+              "P(B) = Σ_i P(A_i ∩ B)",
+              "P(B) = Σ_i P(B | A_i) P(A_i)",
+              "P(A_i | B) = P(B | A_i) P(A_i) / P(B)",
+              "P(A_i) = P(B | A_i) P(B)"
+            ],
+            "answerIndex": 1,
+            "explanation": "The Law of Total Probability states P(B) = Σ_i P(B | A_i) P(A_i) where the {A_i} are mutually exclusive and cover the whole sample space."
+          },
+          {
+            "id": "q-4",
+            "prompt": "Consider a discrete random variable X with E[X] = μ and Var(X) = σ². Which property correctly describes how variance changes under a linear transformation Y = aX + b?",
+            "options": [
+              "Var(Y) = a Var(X) + b",
+              "Var(Y) = a² Var(X)",
+              "Var(Y) = Var(X) + b²",
+              "Var(Y) = a Var(X) - b"
+            ],
+            "answerIndex": 1,
+            "explanation": "Variance scales by the square of the constant multiplied to the variable: Var(aX + b) = a² Var(X). Adding b shifts the mean but does not affect variance."
+          },
+          {
+            "id": "q-5",
+            "prompt": "Which of the following statements correctly describes the unbiasedness property of the sample variance S² estimator?",
+            "options": [
+              "E[S²] = Var(X) because S² divides by n correcting the bias.",
+              "E[S²] = Var(X) because S² divides by n - 1 (Bessel’s correction) to correct the bias.",
+              "E[S²] > Var(X) because S² always overestimates variance.",
+              "E[S²] < Var(X) because sample variance underestimates population variance."
+            ],
+            "answerIndex": 1,
+            "explanation": "Sample variance S² uses divisor n - 1 (Bessel’s correction) which makes it an unbiased estimator: E[S²] = Var(X)."
+          },
+          {
+            "id": "q-6",
+            "prompt": "Given a Bernoulli random variable X with P(X = 1) = p, which distribution describes the number of failures before the first success?",
+            "options": [
+              "Binomial distribution",
+              "Geometric distribution",
+              "Negative Binomial distribution",
+              "Poisson distribution"
+            ],
+            "answerIndex": 1,
+            "explanation": "The Geometric distribution models the number of failures before the first success in Bernoulli trials."
+          },
+          {
+            "id": "q-7",
+            "prompt": "Suppose we transform a standard normal variable X ~ N(0,1) using Y = exp(X). Which statement about the distribution of Y is correct?",
+            "options": [
+              "Y has a normal distribution because exponentiation preserves normality.",
+              "Y has a log-normal distribution since Y = exp(X) and X is normal.",
+              "Y has a uniform distribution on (0,1).",
+              "Y has a Poisson distribution due to the transformation."
+            ],
+            "answerIndex": 1,
+            "explanation": "Exponentiating a normal variable produces a log-normal distribution, i.e., Y = exp(X) when X ~ N(0,1)."
+          }
+        ],
+        "createdAt": "2026-04-05T12:21:45.417Z",
+        "updatedAt": "2026-04-05T12:22:31.727Z",
+        "taken": true,
+        "lastAttempt": {
+          "takenAt": "2026-04-05T12:22:31.727Z",
+          "answers": [
+            {
+              "questionId": "q-1",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-2",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-3",
+              "selectedIndex": 2,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-4",
+              "selectedIndex": 3,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-5",
+              "selectedIndex": 3,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-6",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-7",
+              "selectedIndex": 0,
+              "correctIndex": 1,
+              "isCorrect": false
+            }
+          ],
+          "score": 0,
+          "correctCount": 0,
+          "totalQuestions": 7
+        }
+      },
+      {
+        "id": "1142825-1775391543308-c89bdc",
+        "userId": "1142825",
+        "courseId": "205911",
+        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "scopeType": "study_plan_module",
+        "moduleId": "2313513",
+        "moduleName": "Module 6: Stored Procedures",
+        "title": "Module 6: Stored Procedures Quiz",
+        "selectedModuleIds": [
+          "2313513"
+        ],
+        "selectedFileIds": [],
+        "description": "This quiz tests your understanding of stored procedures concepts, usage, and implementation from the Module 6 materials.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "What is the primary advantage of using stored procedures in a database system?",
+            "options": [
+              "They eliminate the need for transactions",
+              "They allow logic execution on the server for improved performance",
+              "They automatically optimize complex queries for the user",
+              "They store data backups within the database"
+            ],
+            "answerIndex": 1,
+            "explanation": "Stored procedures execute on the database server, which reduces client-server communication and improves performance, a key benefit noted in the Overview of Stored Procedures."
+          },
+          {
+            "id": "q-2",
+            "prompt": "Which of the following is a typical feature supported by stored procedures as described in the course materials?",
+            "options": [
+              "User interface rendering",
+              "Conditional logic and control flow",
+              "Client-side scripting",
+              "Automatic schema migration"
+            ],
+            "answerIndex": 1,
+            "explanation": "Stored procedures can include conditional logic and control flow (such as IF statements and loops), enabling more complex server-side operations, as highlighted in the Learning Materials on Stored Procedures."
+          },
+          {
+            "id": "q-3",
+            "prompt": "When invoking a stored procedure with parameters, how are input and output parameters generally handled?",
+            "options": [
+              "Input parameters are required, output parameters are optional and allow returning values",
+              "Only output parameters are allowed, input parameters are forbidden",
+              "Parameters must all be of the same data type",
+              "Stored procedures cannot accept any parameters"
+            ],
+            "answerIndex": 0,
+            "explanation": "Stored procedures typically accept input parameters to pass data in and can have output parameters to return data, as illustrated in the SP Sample Code material."
+          },
+          {
+            "id": "q-4",
+            "prompt": "Which statement best describes how stored procedures contribute to database security?",
+            "options": [
+              "Stored procedures automatically encrypt all data",
+              "They limit direct table access by encapsulating queries behind controlled execution",
+              "Stored procedures remove the need for database user authentication",
+              "They disable all external database connections"
+            ],
+            "answerIndex": 1,
+            "explanation": "By encapsulating SQL statements inside stored procedures, direct table access can be restricted, enhancing security through controlled execution paths, as explained in the Overview and Learning Materials."
+          },
+          {
+            "id": "q-5",
+            "prompt": "In the context of the provided Assignment on Stored Procedures, why is error handling within a stored procedure important?",
+            "options": [
+              "It guarantees the procedure runs infinitely",
+              "It helps detect and manage exceptions, maintaining data integrity",
+              "It automatically fixes all database errors",
+              "It disables transaction rollbacks"
+            ],
+            "answerIndex": 1,
+            "explanation": "Proper error handling allows procedures to detect exceptions and handle them gracefully, which is essential for maintaining data integrity, as emphasized in the Assignment instructions."
+          },
+          {
+            "id": "q-6",
+            "prompt": "Looking at the SP Sample Code, which SQL statement is commonly used to create a stored procedure?",
+            "options": [
+              "CREATE FUNCTION",
+              "CREATE PROCEDURE",
+              "CREATE VIEW",
+              "CREATE TRIGGER"
+            ],
+            "answerIndex": 1,
+            "explanation": "The standard syntax to create a stored procedure uses the CREATE PROCEDURE statement, as shown in the sample code provided in the Learning Materials."
+          }
+        ],
+        "createdAt": "2026-04-05T12:19:03.309Z",
+        "updatedAt": "2026-04-05T12:19:03.309Z",
+        "taken": false,
+        "lastAttempt": null
+      },
+      {
         "id": "1142825-1775365976905-58a0c7",
         "userId": "1142825",
         "courseId": "205911",
@@ -137,99 +570,6 @@
           "correctCount": 0,
           "totalQuestions": 6
         }
-      },
-      {
-        "id": "1142825-1775364381098-a62b85",
-        "userId": "1142825",
-        "courseId": "205911",
-        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
-        "scopeType": "study_plan_module",
-        "moduleId": "2313510",
-        "moduleName": "Module 3: Populating Tables",
-        "title": "Module 3: Populating Tables Quiz",
-        "selectedModuleIds": [
-          "2313510"
-        ],
-        "selectedFileIds": [],
-        "description": "Assess understanding of methods and best practices for populating tables in advanced database systems.",
-        "questions": [
-          {
-            "id": "q-1",
-            "prompt": "Which SQL statement is primarily used to insert a single row of data into a database table?",
-            "options": [
-              "UPDATE",
-              "INSERT INTO",
-              "SELECT",
-              "DELETE"
-            ],
-            "answerIndex": 1,
-            "explanation": "The INSERT INTO statement is used to add one or more rows of data to a table, as covered in the Populating Tables assignment and sample code."
-          },
-          {
-            "id": "q-2",
-            "prompt": "When inserting multiple rows in one SQL statement, what is the correct syntax to separate each row's data?",
-            "options": [
-              "Use commas between each row enclosed in parentheses",
-              "Use semicolons between values",
-              "Use 'AND' between each row",
-              "Place each row on a new line without punctuation"
-            ],
-            "answerIndex": 0,
-            "explanation": "Multiple rows can be inserted by listing each row's values in parentheses separated by commas, as demonstrated in the sample code for populating tables."
-          },
-          {
-            "id": "q-3",
-            "prompt": "Which practice is recommended when populating tables to ensure data integrity during bulk insert operations?",
-            "options": [
-              "Disable all constraints before inserting",
-              "Use transactions to group insert statements",
-              "Insert data without defining column names",
-              "Skip committing changes to improve speed"
-            ],
-            "answerIndex": 1,
-            "explanation": "Using transactions allows grouping inserts to ensure atomicity and consistency, a best practice highlighted in the assignment discussions."
-          },
-          {
-            "id": "q-4",
-            "prompt": "In the context of the module, what advantage does using sample code for populating tables offer?",
-            "options": [
-              "It eliminates the need for schema design",
-              "It provides templates to correctly format insert statements",
-              "It automatically optimizes database indexes",
-              "It generates random data without validation"
-            ],
-            "answerIndex": 1,
-            "explanation": "Sample code offers templates that help students format their insert statements correctly, supporting understanding of the syntax and approach."
-          },
-          {
-            "id": "q-5",
-            "prompt": "What is the effect of omitting the column list in an INSERT INTO statement while populating tables?",
-            "options": [
-              "The database automatically matches columns by name",
-              "The statement will fail unless all columns have default values",
-              "The data is ignored and not inserted",
-              "All columns must be provided values in the order defined by the table schema"
-            ],
-            "answerIndex": 3,
-            "explanation": "If the column list is omitted, values must be provided for all columns in the defined schema order, as explained in the sample code and assignment instructions."
-          },
-          {
-            "id": "q-6",
-            "prompt": "Which of the following is a key consideration when using scripts to populate tables as part of the assignment?",
-            "options": [
-              "Scripts guarantee uniqueness across all database instances automatically",
-              "Scripts must handle potential errors and rollbacks appropriately",
-              "Scripts do not require careful data type matching",
-              "Scripts replace the need for database normalization"
-            ],
-            "answerIndex": 1,
-            "explanation": "Proper error handling and rollback are important to maintain database integrity during insert operations, as emphasized in the assignment guidance."
-          }
-        ],
-        "createdAt": "2026-04-05T04:46:21.098Z",
-        "updatedAt": "2026-04-05T04:46:21.098Z",
-        "taken": false,
-        "lastAttempt": null
       },
       {
         "id": "1142825-1775364153163-404374",

@@ -2,7 +2,7 @@
   "plansByUser": {
     "1142825": [
       {
-        "id": "1142825-1775364409999",
+        "id": "1142825-1775392124640",
         "userId": "1142825",
         "planName": "Stay on track in IFT 530: Adv DB Management Systems (2025 Spring C)",
         "goalName": "Stay on track in IFT 530: Adv DB Management Systems (2025 Spring C)",
@@ -13,19 +13,18 @@
           "endDate": "2026-04-19",
           "objective": "Stay on track in IFT 530: Adv DB Management Systems (2025 Spring C)",
           "hoursPerWeek": 8,
-          "sessionMinutes": 60,
+          "sessionMinutes": 30,
           "pace": "balanced",
           "includeAssignments": true,
           "focusDays": [
             "Mon",
-            "Tue",
             "Wed",
-            "Thu",
             "Fri"
           ],
           "priorities": [],
           "selectedModuleIds": [
-            "2313510"
+            "2313510",
+            "2313512"
           ]
         },
         "scopedModules": [
@@ -33,73 +32,281 @@
             "id": 2313510,
             "name": "Module 3: Populating Tables",
             "position": 5
+          },
+          {
+            "id": 2313512,
+            "name": "Module 5: Scripting",
+            "position": 7
           }
         ],
         "plan": {
-          "overview": "This study plan focuses on mastering the Module 3 content on populating tables using SQL Server. It aims to build strong skills in writing T-SQL to insert, update, and delete data effectively.",
+          "overview": "This plan guides balanced, focused study on populating tables and scripting in advanced database systems, preparing for related assignments while reinforcing key T-SQL skills.",
           "recommendations": [
-            "Review the provided sample code carefully and practice replicating queries each study day.",
-            "Spend time experimenting with different data types and constraints to understand table population nuances."
+            "Review sample code in each module before attempting assignments to understand practical implementations.",
+            "Practice writing and debugging scripts regularly using provided sample materials to build confidence."
           ],
           "weeklyPlan": [
             {
               "day": "Week 1",
-              "focus": "Understand core concepts and syntax for populating tables",
+              "focus": "Master populating tables concepts",
               "tasks": [
-                "Read all learning materials on populating tables",
-                "Study the sample code examples in detail",
-                "Practice simple INSERT statements"
+                "Read Module 3 Populating Tables learning materials",
+                "Study sample code for populating tables",
+                "Start completing the Populating Tables assignment"
               ]
             },
             {
               "day": "Week 2",
-              "focus": "Practice advanced table population techniques",
+              "focus": "Complete Populating Tables assignment and begin scripting",
               "tasks": [
-                "Work on UPDATE, DELETE and transaction control statements",
-                "Create scripts simulating real-world scenarios of data population",
-                "Review errors and troubleshoot sample code issues"
+                "Finalize and submit Populating Tables assignment",
+                "Begin Module 5 Scripting learning materials",
+                "Practice scripting sample code exercises"
+              ]
+            },
+            {
+              "day": "Week 3",
+              "focus": "Advance scripting skills and complete scripting assignment",
+              "tasks": [
+                "Complete Scripting learning materials and review samples",
+                "Develop scripts to manipulate relational data using T-SQL",
+                "Submit the Scripting assignment on time"
               ]
             }
           ],
           "milestones": [
             {
-              "title": "Submit Assignment: Populating Tables",
-              "dueDate": "2025-02-03T06:59:00Z",
-              "reason": "Demonstrates your ability to effectively populate tables using T-SQL commands"
+              "title": "Populating Tables Assignment Due",
+              "dueDate": "2026-04-12T06:59:00Z",
+              "reason": "Demonstrates competence in data entry and table population essential for database manipulation."
             },
             {
-              "title": "Completion of Module 3 Quiz",
-              "dueDate": "2025-02-03T06:59:00Z",
-              "reason": "Tests understanding of concepts and syntax learned in Module 3"
+              "title": "Scripting Assignment Due",
+              "dueDate": "2026-04-19T06:59:00Z",
+              "reason": "Validates ability to develop and automate database scripts critical for advanced DB management."
             }
           ],
           "customTips": [
-            "Schedule focused 60-minute study blocks on weekdays to maximize retention.",
-            "Use a SQL Server environment to test queries immediately after learning them."
+            "Use the 30-minute session format for focused study segments to prevent burnout and maintain attention.",
+            "Regularly back up your scripts and assignments to avoid loss of work and facilitate easy revisions."
+          ],
+          "dailySchedule": [
+            {
+              "weekLabel": "Week 1",
+              "focus": "Master populating tables concepts",
+              "days": [
+                {
+                  "dayKey": "Mon",
+                  "label": "Monday",
+                  "date": "2026-04-05",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Read Module 3 Populating Tables learning materials"
+                  ]
+                },
+                {
+                  "dayKey": "Tue",
+                  "label": "Tuesday",
+                  "date": "2026-04-06",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Wed",
+                  "label": "Wednesday",
+                  "date": "2026-04-07",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Start completing the Populating Tables assignment"
+                  ]
+                },
+                {
+                  "dayKey": "Thu",
+                  "label": "Thursday",
+                  "date": "2026-04-08",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Fri",
+                  "label": "Friday",
+                  "date": "2026-04-09",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Study sample code for populating tables"
+                  ]
+                },
+                {
+                  "dayKey": "Sat",
+                  "label": "Saturday",
+                  "date": "2026-04-10",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Sun",
+                  "label": "Sunday",
+                  "date": "2026-04-11",
+                  "schedule": "Open slot",
+                  "tasks": []
+                }
+              ]
+            },
+            {
+              "weekLabel": "Week 2",
+              "focus": "Complete Populating Tables assignment and begin scripting",
+              "days": [
+                {
+                  "dayKey": "Mon",
+                  "label": "Monday",
+                  "date": "2026-04-12",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Finalize and submit Populating Tables assignment"
+                  ]
+                },
+                {
+                  "dayKey": "Tue",
+                  "label": "Tuesday",
+                  "date": "2026-04-13",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Wed",
+                  "label": "Wednesday",
+                  "date": "2026-04-14",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Practice scripting sample code exercises"
+                  ]
+                },
+                {
+                  "dayKey": "Thu",
+                  "label": "Thursday",
+                  "date": "2026-04-15",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Fri",
+                  "label": "Friday",
+                  "date": "2026-04-16",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Begin Module 5 Scripting learning materials"
+                  ]
+                },
+                {
+                  "dayKey": "Sat",
+                  "label": "Saturday",
+                  "date": "2026-04-17",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Sun",
+                  "label": "Sunday",
+                  "date": "2026-04-18",
+                  "schedule": "Open slot",
+                  "tasks": []
+                }
+              ]
+            },
+            {
+              "weekLabel": "Week 3",
+              "focus": "Advance scripting skills and complete scripting assignment",
+              "days": [
+                {
+                  "dayKey": "Mon",
+                  "label": "Monday",
+                  "date": "2026-04-19",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Complete Scripting learning materials and review samples"
+                  ]
+                },
+                {
+                  "dayKey": "Tue",
+                  "label": "Tuesday",
+                  "date": "2026-04-20",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Wed",
+                  "label": "Wednesday",
+                  "date": "2026-04-21",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Submit the Scripting assignment on time"
+                  ]
+                },
+                {
+                  "dayKey": "Thu",
+                  "label": "Thursday",
+                  "date": "2026-04-22",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Fri",
+                  "label": "Friday",
+                  "date": "2026-04-23",
+                  "schedule": "30m study block",
+                  "tasks": [
+                    "Develop scripts to manipulate relational data using T-SQL"
+                  ]
+                },
+                {
+                  "dayKey": "Sat",
+                  "label": "Saturday",
+                  "date": "2026-04-24",
+                  "schedule": "Open slot",
+                  "tasks": []
+                },
+                {
+                  "dayKey": "Sun",
+                  "label": "Sunday",
+                  "date": "2026-04-25",
+                  "schedule": "Open slot",
+                  "tasks": []
+                }
+              ]
+            }
           ]
         },
         "schedule": [
           {
             "day": "Week 1",
-            "focus": "Understand core concepts and syntax for populating tables",
+            "focus": "Master populating tables concepts",
             "tasks": [
-              "Read all learning materials on populating tables",
-              "Study the sample code examples in detail",
-              "Practice simple INSERT statements"
+              "Read Module 3 Populating Tables learning materials",
+              "Study sample code for populating tables",
+              "Start completing the Populating Tables assignment"
             ]
           },
           {
             "day": "Week 2",
-            "focus": "Practice advanced table population techniques",
+            "focus": "Complete Populating Tables assignment and begin scripting",
             "tasks": [
-              "Work on UPDATE, DELETE and transaction control statements",
-              "Create scripts simulating real-world scenarios of data population",
-              "Review errors and troubleshoot sample code issues"
+              "Finalize and submit Populating Tables assignment",
+              "Begin Module 5 Scripting learning materials",
+              "Practice scripting sample code exercises"
+            ]
+          },
+          {
+            "day": "Week 3",
+            "focus": "Advance scripting skills and complete scripting assignment",
+            "tasks": [
+              "Complete Scripting learning materials and review samples",
+              "Develop scripts to manipulate relational data using T-SQL",
+              "Submit the Scripting assignment on time"
             ]
           }
         ],
-        "createdAt": "2026-04-05T04:46:49.999Z",
-        "updatedAt": "2026-04-05T04:46:49.999Z"
+        "createdAt": "2026-04-05T12:28:44.640Z",
+        "updatedAt": "2026-04-05T12:28:44.640Z"
       },
       {
         "id": "1142825-1775363448748",

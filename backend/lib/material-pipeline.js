@@ -337,8 +337,12 @@ Rules:
 - First slide must be title. Last slide must be summary.
 - Keep bullets short and clean.
 - Narration must sound like a teacher, not copied text.
+- Include concrete real-life examples or applications throughout the lesson, not just in one place.
+- Aim for at least 2 example/application slides or example moments in narration when the content supports it.
+- For abstract material, relate ideas to student life, work, business, technology, or everyday decisions.
 - Do not include OCR fragments, copyright lines, page numbers, or textbook boilerplate.
 - The lesson should feel polished enough to watch directly from a dashboard.
+- Keep examples plausible and grounded in the source material.
 
 Course: ${courseName}
 Module: ${moduleName}

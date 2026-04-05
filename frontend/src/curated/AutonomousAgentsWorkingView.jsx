@@ -205,8 +205,6 @@ export default function AutonomousAgentsWorkingView({
   selectedMaterial = null,
   selectedMaterialView = "summary",
   sendingMessageId = null,
-  animatedVideoJobs = {},
-  onStartAnimatedVideo,
 }) {
   const messageCards = feed
     .filter((item) => item.type === "message")
@@ -294,8 +292,6 @@ export default function AutonomousAgentsWorkingView({
             item={selectedMaterial}
             view={selectedMaterialView}
             onRetry={onRetryMaterial}
-            animatedVideoJob={selectedMaterial ? animatedVideoJobs[selectedMaterial.id] : null}
-            onStartAnimatedVideo={onStartAnimatedVideo}
           />
           <SettingsPanel
             preferences={preferences}

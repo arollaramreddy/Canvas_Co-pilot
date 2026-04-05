@@ -22,7 +22,6 @@ function App() {
   const {
     drafts,
     error: autonomousError,
-    animatedVideoJobs,
     feed,
     loading: autonomousLoading,
     materialCards,
@@ -37,7 +36,6 @@ function App() {
     sendingMessageId,
     selectedMaterial,
     selectedMaterialView,
-    startAnimatedVideo,
     syncNow,
     syncing,
   } = useAutonomousInboxFeed(undefined, user?.name || "");
@@ -234,8 +232,6 @@ function App() {
                     selectedMaterial={selectedMaterial}
                     selectedMaterialView={selectedMaterialView}
                     sendingMessageId={sendingMessageId}
-                    animatedVideoJobs={animatedVideoJobs}
-                    onStartAnimatedVideo={startAnimatedVideo}
                   />
                 )}
 

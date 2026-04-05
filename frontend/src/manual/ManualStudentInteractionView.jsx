@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./manualStudentInteraction.css";
-import AnimatedLessonPlayer from "../animated-lessons/AnimatedLessonPlayer";
 
 const DEFAULT_SETTINGS = {
   previewLength: 2000,
@@ -21,8 +20,6 @@ const LESSON_MODE_OPTIONS = [
   { id: "quick", label: "Quick" },
   { id: "detailed", label: "Detailed" },
 ];
-
-const ANIMATED_TERMINAL_STATUSES = new Set(["ready", "failed"]);
 
 function formatDate(dateStr) {
   if (!dateStr) return "No due date";
@@ -136,6 +133,8 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
   const [audioUrls, setAudioUrls] = useState({});
   const [muted, setMuted] = useState(false);
   const audioRef = useRef(null);
+  const playerRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const slide = lesson.slides[slideIndex] || {};
   const isFirst = slideIndex === 0;
@@ -229,6 +228,17 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
     setSpeaking(true);
   }, [autoPlayToken]);
 
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === playerRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    };
+  }, []);
+
   function toggleSpeaking() {
     if (speaking) {
       audioRef.current?.pause();
@@ -244,19 +254,48 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
     onClose?.();
   }
 
+  async function toggleFullscreen() {
+    const playerNode = playerRef.current;
+    if (!playerNode) return;
+
+    try {
+      if (document.fullscreenElement === playerNode) {
+        await document.exitFullscreen();
+      } else {
+        await playerNode.requestFullscreen();
+      }
+    } catch {
+      setSpeechError("Fullscreen is not available in this browser view.");
+    }
+  }
+
   const player = (
-      <div className={`manual-lesson-player ${inline ? "inline" : ""}`} onClick={(event) => event.stopPropagation()}>
+      <div
+        ref={playerRef}
+        className={`manual-lesson-player ${inline ? "inline" : ""} ${isFullscreen ? "fullscreen" : ""}`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <audio ref={audioRef} preload="auto" />
         <div className="manual-lesson-player-header">
           <div className="manual-toolbar-actions">
             <span className="manual-lesson-player-badge">Video Lesson</span>
             <span className="manual-lesson-player-title">{lesson.title}</span>
           </div>
-          {onClose ? (
-            <button className="manual-lesson-player-close" onClick={closePlayer} aria-label="Close lesson">
-              ×
+          <div className="manual-lesson-player-header-actions">
+            <button
+              className="manual-lesson-player-expand"
+              onClick={toggleFullscreen}
+              type="button"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             </button>
-          ) : null}
+            {onClose ? (
+              <button className="manual-lesson-player-close" onClick={closePlayer} aria-label="Close lesson">
+                ×
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="manual-lesson-stage">
@@ -383,12 +422,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
   const [lessonJobs, setLessonJobs] = useState({});
   const [lessonModes, setLessonModes] = useState({});
   const [activeLessonFileId, setActiveLessonFileId] = useState(null);
-  const [activeAnimatedLessonFileId, setActiveAnimatedLessonFileId] = useState(null);
   const [lessonAutoPlayState, setLessonAutoPlayState] = useState({ fileId: null, nonce: 0 });
-  const [animatedLessonAutoPlayState, setAnimatedLessonAutoPlayState] = useState({
-    fileId: null,
-    nonce: 0,
-  });
   const lessonPanelRefs = useRef({});
 
   const settings = DEFAULT_SETTINGS;
@@ -429,9 +463,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     setLessonJobs({});
     setLessonModes({});
     setActiveLessonFileId(null);
-    setActiveAnimatedLessonFileId(null);
     setLessonAutoPlayState({ fileId: null, nonce: 0 });
-    setAnimatedLessonAutoPlayState({ fileId: null, nonce: 0 });
   }, []);
 
   const fetchCourses = useCallback(async () => {
@@ -699,7 +731,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
         lesson,
       });
       setActiveLessonFileId(fileId);
-      setActiveAnimatedLessonFileId(null);
       requestAnimationFrame(() => {
         lessonPanelRefs.current[fileId]?.scrollIntoView({
           behavior: "smooth",
@@ -715,147 +746,13 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     }
   }
 
-  async function handleGenerateAnimatedLesson(file) {
-    if (!selectedCourse) return;
-
-    const fileId = String(file.id);
-    const mode = getLessonMode(fileId);
-    const existingLesson = lessonJobs[fileId]?.lesson || null;
-
-    updateLessonJob(fileId, {
-      animatedLoading: true,
-      animatedJobId: null,
-      animatedStatusCode: "queued",
-      animatedError: "",
-      animatedStatus: "Queued for background rendering...",
-      animatedSteps: ["Queued for background rendering..."],
-      animatedLesson: null,
-    });
-
-    try {
-      let lesson = existingLesson;
-      if (!lesson) {
-        updateLessonJob(fileId, (current) => ({
-          ...current,
-          loading: true,
-          status: "Generating narrated lesson slides...",
-          steps: ["Generating narrated lesson slides..."],
-        }));
-        lesson = await createBaseLessonForFile(file, mode);
-        updateLessonJob(fileId, (current) => ({
-          ...current,
-          loading: false,
-          error: "",
-          status: "Lesson ready",
-          steps: [],
-          lesson,
-        }));
-      }
-
-      const animatedJob = await apiFetchJson("/generate-animated-lesson", {
-        method: "POST",
-        body: JSON.stringify({
-          lesson,
-          sourceFileId: fileId,
-        }),
-      });
-
-      updateLessonJob(fileId, {
-        animatedLoading: false,
-        animatedJobId: animatedJob.jobId,
-        animatedStatusCode: animatedJob.status || "queued",
-        animatedError: "",
-        animatedStatus: animatedJob.progressMessage || "Queued for background rendering",
-        animatedSteps: ["Queued for background rendering..."],
-        animatedLesson: null,
-      });
-    } catch (error) {
-      updateLessonJob(fileId, {
-        animatedLoading: false,
-        animatedStatusCode: "failed",
-        animatedError: error.message || "Animated lesson generation failed",
-        animatedStatus: "Animated lesson generation failed",
-      });
-    }
-  }
-
-  useEffect(() => {
-    const pendingEntries = Object.entries(lessonJobs).filter(([, job]) => {
-      if (!job?.animatedJobId) return false;
-      return !ANIMATED_TERMINAL_STATUSES.has(String(job.animatedStatusCode || ""));
-    });
-
-    if (!pendingEntries.length) return undefined;
-
-    let cancelled = false;
-
-    async function pollAnimatedJobs() {
-      await Promise.all(
-        pendingEntries.map(async ([fileId, job]) => {
-          try {
-            const result = await apiFetchJson(`/generate-animated-lesson/${job.animatedJobId}`, {
-              headers: {},
-            });
-            if (cancelled) return;
-
-            updateLessonJob(fileId, (current) => ({
-              ...current,
-              animatedLoading: false,
-              animatedStatusCode: result.status || current.animatedStatusCode || "processing",
-              animatedStatus: result.progressMessage || current.animatedStatus || "Processing...",
-              animatedLesson: result.lessonPackage || current.animatedLesson || null,
-              animatedError: result.error || "",
-              animatedSteps: result.progressMessage
-                ? Array.from(new Set([...(current.animatedSteps || []), result.progressMessage]))
-                : current.animatedSteps || [],
-            }));
-
-            if (result.status === "ready") {
-              setActiveAnimatedLessonFileId(fileId);
-              setActiveLessonFileId(null);
-              setAnimatedLessonAutoPlayState((current) => ({
-                fileId,
-                nonce: current.nonce + 1,
-              }));
-            }
-          } catch (error) {
-            if (cancelled) return;
-            updateLessonJob(fileId, (current) => ({
-              ...current,
-              animatedLoading: false,
-              animatedStatusCode: "failed",
-              animatedStatus: "Animated lesson generation failed",
-              animatedError: error.message || "Animated lesson generation failed",
-            }));
-          }
-        })
-      );
-    }
-
-    pollAnimatedJobs();
-    const intervalId = window.setInterval(pollAnimatedJobs, 3000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [apiFetchJson, lessonJobs]);
-
   function renderLessonPanel(file) {
     const job = lessonJobs[String(file.id)];
     if (!job) return null;
     const fileId = String(file.id);
     const isActiveLesson = activeLessonFileId === fileId && !!job.lesson;
-    const isAnimatedReady = String(job.animatedStatusCode || "") === "ready" && !!job.animatedLesson;
-    const isAnimatedFailed = String(job.animatedStatusCode || "") === "failed";
-    const isAnimatedPending =
-      Boolean(job.animatedJobId) &&
-      !ANIMATED_TERMINAL_STATUSES.has(String(job.animatedStatusCode || ""));
-    const isActiveAnimatedLesson = activeAnimatedLessonFileId === fileId && isAnimatedReady;
     const lessonAutoPlayToken =
       lessonAutoPlayState.fileId === fileId ? lessonAutoPlayState.nonce : 0;
-    const animatedAutoPlayToken =
-      animatedLessonAutoPlayState.fileId === fileId ? animatedLessonAutoPlayState.nonce : 0;
 
     return (
       <div
@@ -884,7 +781,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
               onClick={() => {
                 if (job.lesson && !job.loading) {
                   setActiveLessonFileId((current) => (current === fileId ? null : fileId));
-                  setActiveAnimatedLessonFileId(null);
                   if (!isActiveLesson) {
                     setLessonAutoPlayState((current) => ({
                       fileId,
@@ -918,44 +814,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                 Regenerate
               </button>
             ) : null}
-            <button
-              className="manual-btn primary"
-              onClick={() => {
-                if (isAnimatedReady && !job.animatedLoading) {
-                  setActiveAnimatedLessonFileId((current) => (current === fileId ? null : fileId));
-                  setActiveLessonFileId(null);
-                  if (!isActiveAnimatedLesson) {
-                    setAnimatedLessonAutoPlayState((current) => ({
-                      fileId,
-                      nonce: current.nonce + 1,
-                    }));
-                  }
-                  requestAnimationFrame(() => {
-                    lessonPanelRefs.current[fileId]?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "center",
-                    });
-                  });
-                  return;
-                }
-                handleGenerateAnimatedLesson(file);
-              }}
-              disabled={job.animatedLoading || isAnimatedPending}
-            >
-              {job.animatedLoading || isAnimatedPending
-                ? job.animatedStatusCode === "encoding"
-                  ? "Encoding animated..."
-                  : job.animatedStatusCode === "rendering"
-                    ? "Rendering animated..."
-                    : "Processing animated..."
-                : isAnimatedReady
-                  ? isActiveAnimatedLesson
-                    ? "Hide animated"
-                    : "Animated Video Lesson"
-                  : isAnimatedFailed
-                    ? "Retry animated"
-                    : "Generate animated"}
-            </button>
           </div>
         </div>
 
@@ -977,25 +835,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
         ) : null}
 
         {job.error ? <div className="manual-note error">{job.error}</div> : null}
-        {job.animatedLoading || isAnimatedPending ? (
-          <div className="manual-note">
-            {job.animatedStatus ||
-              "Building animated scenes, matching Lottie visuals, generating narration audio, and preparing the Remotion export."}
-          </div>
-        ) : null}
-
-        {job.animatedSteps?.length ? (
-          <div className="manual-lesson-steps">
-            {job.animatedSteps.map((step, index) => (
-              <div key={`${step}-${index}`} className="manual-lesson-step">
-                <span className="manual-lesson-step-dot" />
-                <span>{step}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {job.animatedError ? <div className="manual-note error">{job.animatedError}</div> : null}
 
         {job.lesson ? (
           <>
@@ -1015,25 +854,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
               />
             ) : null}
           </>
-        ) : null}
-
-        {isAnimatedReady ? (
-          <div className="manual-animated-lesson-panel">
-            <div className="manual-lesson-meta">
-              Animated explainer · {job.animatedLesson.scenes?.length || 0} scenes · ~
-              {job.animatedLesson.estimated_minutes} min · {job.animatedStatusCode}
-            </div>
-            <div className="manual-lesson-script">
-              {job.animatedLesson.scenes?.[0]?.captionGroups?.[0] ||
-                "Animated scenes are derived from the narration script and matched to Lottie visuals automatically."}
-            </div>
-            {isActiveAnimatedLesson ? (
-              <AnimatedLessonPlayer
-                lesson={job.animatedLesson}
-                autoPlayToken={animatedAutoPlayToken}
-              />
-            ) : null}
-          </div>
         ) : null}
       </div>
     );
@@ -1312,28 +1132,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                                       : lessonJobs[String(file.id)]?.lesson
                                         ? "Regenerate lesson"
                                         : "Video lesson"}
-                                  </button>
-                                  <button
-                                    className="manual-btn primary"
-                                    onClick={() => handleGenerateAnimatedLesson(file)}
-                                    disabled={
-                                      lessonJobs[String(file.id)]?.animatedLoading ||
-                                      (lessonJobs[String(file.id)]?.animatedJobId &&
-                                        !ANIMATED_TERMINAL_STATUSES.has(
-                                          String(lessonJobs[String(file.id)]?.animatedStatusCode || "")
-                                        ))
-                                    }
-                                  >
-                                    {lessonJobs[String(file.id)]?.animatedLoading ||
-                                    (lessonJobs[String(file.id)]?.animatedJobId &&
-                                      !ANIMATED_TERMINAL_STATUSES.has(
-                                        String(lessonJobs[String(file.id)]?.animatedStatusCode || "")
-                                      ))
-                                      ? "Animated processing..."
-                                      : lessonJobs[String(file.id)]?.animatedLesson &&
-                                          lessonJobs[String(file.id)]?.animatedStatusCode === "ready"
-                                        ? "Animated Video Lesson"
-                                        : "Generate animated"}
                                   </button>
                                 </div>
                               ) : null}

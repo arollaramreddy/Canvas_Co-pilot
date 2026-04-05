@@ -29,12 +29,6 @@ const {
   ensureLessonAudioDir,
   generateLessonSlideAudio,
 } = require("./lib/lesson-audio");
-const {
-  createAnimatedVideoJob,
-  getAnimatedVideoJob,
-  processQueuedAnimatedVideoJobs,
-  recoverStaleAnimatedVideoJobs,
-} = require("./lib/animated-lesson");
 const { parseJsonResponse } = require("./lib/json-response");
 const {
   buildReplyDraftPrompt,
@@ -69,7 +63,6 @@ const oauthStateStore = new Map();
 let agentWorkerBusy = false;
 let autonomousMonitorBusy = false;
 let materialPipelineBusy = false;
-let animatedVideoWorkerBusy = false;
 
 function parseCookies(req) {
   const cookieHeader = req.headers.cookie || "";
@@ -1203,26 +1196,6 @@ setInterval(async () => {
     materialPipelineBusy = false;
   }
 }, 12000);
-
-setInterval(async () => {
-  if (animatedVideoWorkerBusy) return;
-  animatedVideoWorkerBusy = true;
-  try {
-    await withDatabaseAsync((animatedJobDb) => {
-      // Recover jobs whose worker process died
-      recoverStaleAnimatedVideoJobs(animatedJobDb, 10);
-      return processQueuedAnimatedVideoJobs({
-        db: animatedJobDb,
-        backendUrl: BACKEND_URL,
-        limit: 1,
-      });
-    });
-  } catch (error) {
-    console.error("Animated video worker loop failed:", error.message);
-  } finally {
-    animatedVideoWorkerBusy = false;
-  }
-}, 6000);
 
 // ── Existing Endpoints ────────────────────────────────────
 
@@ -2951,10 +2924,15 @@ Rules:
 - Generate exactly 8-14 slides
 - First slide: type "title". Last slide: type "summary"
 - Mix concept, definition, example slides based on actual content
+- Include concrete real-life or familiar examples throughout the lesson, not just on one slide
+- Prefer at least 2-3 example/application moments across the lesson when the material allows it
+- For abstract topics, connect the idea to a student, workplace, business, technology, or everyday-life situation
 - Narration sounds NATURAL when spoken aloud — conversational, not bullet-reading
+- Narration should often make the concept relatable with a short real-world example or application
 - Bullets: max 4 per slide, short phrases only (5-8 words each)
 - duration_seconds ≈ narration word count ÷ 2.3
 - Focus on the most important ideas from the material
+- Do not invent unrealistic facts; examples should stay plausible and educational
 
 Material title: "${title || "Course Material"}"
 
@@ -2994,77 +2972,6 @@ app.post("/api/generate-lesson-audio", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: `Lesson audio generation failed: ${err.message}` });
-  }
-});
-
-app.post("/api/generate-animated-lesson", async (req, res) => {
-  const { lesson, sourceFileId = null } = req.body || {};
-  if (!lesson || !Array.isArray(lesson.slides) || !lesson.slides.length) {
-    return res.status(400).json({ error: "lesson with slides is required" });
-  }
-
-  try {
-    const context = getSessionContext(req);
-    if (!context.userId) {
-      return res.status(401).json({ error: "No authenticated session" });
-    }
-
-    const job = withDatabase((animatedJobDb) =>
-      createAnimatedVideoJob(animatedJobDb, {
-        userId: context.userId,
-        sourceFileId,
-        title: lesson.title || "Animated lesson",
-        lesson,
-      })
-    );
-
-    console.log(
-      `[animated-video] job created ${job.id} user=${context.userId} sourceFile=${sourceFileId || "none"}`
-    );
-
-    res.status(202).json({
-      jobId: job.id,
-      status: job.status,
-      progressMessage: job.progressMessage,
-    });
-  } catch (err) {
-    res.status(500).json({ error: `Animated lesson generation failed: ${err.message}` });
-  }
-});
-
-app.get("/api/generate-animated-lesson/:jobId", async (req, res) => {
-  try {
-    const context = getSessionContext(req);
-    if (!context.userId) {
-      return res.status(401).json({ error: "No authenticated session" });
-    }
-
-    const job = withDatabase((animatedJobDb) =>
-      getAnimatedVideoJob(animatedJobDb, req.params.jobId, context.userId)
-    );
-    if (!job) {
-      return res.status(404).json({ error: "Animated lesson job not found" });
-    }
-
-    res.json({
-      jobId: job.id,
-      status: job.status,
-      progressMessage: job.progressMessage,
-      lessonPackage: job.lessonPackage
-        ? {
-            ...job.lessonPackage,
-            videoUrl: job.videoUrl,
-            videoFileName: job.videoFileName,
-            renderStatus: job.status,
-          }
-        : null,
-      videoUrl: job.videoUrl,
-      error: job.error,
-      readyAt: job.readyAt,
-      updatedAt: job.updatedAt,
-    });
-  } catch (err) {
-    res.status(500).json({ error: `Failed to load animated lesson job: ${err.message}` });
   }
 });
 

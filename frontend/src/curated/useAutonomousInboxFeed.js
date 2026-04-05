@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildFeed,
-  createAnimatedVideoJob,
   draftReply,
   loadDashboardMaterials,
   loadMessages,
   loadRuntimeState,
   loadStateEvents,
-  pollAnimatedVideoJob,
   runAutonomousMonitor,
   retryDashboardMaterial,
   savePreferences,
@@ -48,10 +46,6 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
   const [sendingMessageId, setSendingMessageId] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [error, setError] = useState("");
-
-  // ── Animated video job state ────────────────────────────
-  const [animatedVideoJobs, setAnimatedVideoJobs] = useState({});
-  const pollTimersRef = useRef({});
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -228,71 +222,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
     }
   }, [dashboardMaterials, selectedMaterial?.id]);
 
-  // ── Animated video: start job + poll ────────────────────
-  const startAnimatedVideo = useCallback(async (item) => {
-    if (!item?.lesson?.slides?.length) return;
-    const materialId = item.id;
-    setError("");
-
-    // Prevent duplicate creation
-    const existing = animatedVideoJobs[materialId];
-    if (existing && existing.status !== "failed") return;
-
-    try {
-      const result = await createAnimatedVideoJob(item.lesson, item.materialEntityId || null);
-      const jobId = result.jobId;
-      setAnimatedVideoJobs((prev) => ({
-        ...prev,
-        [materialId]: { jobId, status: "queued", progressMessage: "Queued for rendering" },
-      }));
-
-      // Start polling
-      const poll = () => {
-        const timer = setInterval(async () => {
-          try {
-            const status = await pollAnimatedVideoJob(jobId);
-            setAnimatedVideoJobs((prev) => ({
-              ...prev,
-              [materialId]: {
-                jobId,
-                status: status.status,
-                progressMessage: status.progressMessage || "",
-                videoUrl: status.videoUrl || null,
-                lessonPackage: status.lessonPackage || null,
-                error: status.error || "",
-              },
-            }));
-            if (status.status === "ready" || status.status === "failed") {
-              clearInterval(timer);
-              delete pollTimersRef.current[materialId];
-            }
-          } catch {
-            clearInterval(timer);
-            delete pollTimersRef.current[materialId];
-          }
-        }, 4000);
-        pollTimersRef.current[materialId] = timer;
-      };
-      poll();
-    } catch (err) {
-      setError(err.message || "Failed to start animated video generation");
-      setAnimatedVideoJobs((prev) => ({
-        ...prev,
-        [materialId]: { status: "failed", error: err.message },
-      }));
-    }
-  }, [animatedVideoJobs]);
-
-  // Clean up poll timers on unmount
-  useEffect(() => {
-    const timers = pollTimersRef.current;
-    return () => {
-      Object.values(timers).forEach(clearInterval);
-    };
-  }, []);
-
   return {
-    animatedVideoJobs,
     drafts,
     error,
     feed,
@@ -312,7 +242,6 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
     selectedMaterial,
     selectedMaterialView,
     sendingMessageId,
-    startAnimatedVideo,
     syncNow,
     syncing,
   };

@@ -181,22 +181,6 @@ function initializeSchema(database) {
   CREATE UNIQUE INDEX IF NOT EXISTS idx_material_pipeline_unique
   ON material_pipeline_items(user_id, course_id, material_entity_id);
 
-  CREATE TABLE IF NOT EXISTS animated_video_jobs (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    source_file_id TEXT,
-    title TEXT,
-    status TEXT DEFAULT 'queued',
-    progress_message TEXT,
-    lesson_json TEXT,
-    lesson_package_json TEXT,
-    video_url TEXT,
-    video_file_name TEXT,
-    error_text TEXT,
-    ready_at TEXT,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-  );
   `);
 }
 

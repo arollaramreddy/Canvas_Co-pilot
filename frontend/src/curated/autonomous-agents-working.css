@@ -325,6 +325,13 @@
   gap: 12px;
 }
 
+.material-video-topbar-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .material-video-badge,
 .material-video-counter {
   font-size: 12px;
@@ -368,6 +375,15 @@
   width: min(100%, 420px);
 }
 
+.material-video-fullscreen {
+  white-space: nowrap;
+}
+
+.material-video-stage-fullscreen {
+  min-height: 100vh;
+  border-radius: 0;
+}
+
 .material-audio-note {
   margin: 0;
   font-size: 13px;
@@ -406,66 +422,6 @@
   .material-video-controls audio {
     width: 100%;
   }
-}
-
-/* ── Animated video section ─────────────────────────────── */
-
-.animated-video-section {
-  margin-top: 16px;
-  padding: 16px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #f0f4ff 0%, #f8f6ff 100%);
-  border: 1px solid rgba(30, 41, 59, 0.06);
-}
-
-.section-header-inline {
-  margin-bottom: 12px;
-}
-
-.animated-video-btn {
-  width: 100%;
-  padding: 12px 20px;
-  font-weight: 600;
-}
-
-.animated-video-status {
-  padding: 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(30, 41, 59, 0.06);
-}
-
-.animated-video-status-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-
-.animated-video-status p {
-  margin: 0;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.animated-video-error {
-  color: #dc2626;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.animated-video-status-queued,
-.animated-video-status-rendering,
-.animated-video-status-encoding {
-  border-left: 3px solid #3b82f6;
-}
-
-.animated-video-status-ready {
-  border-left: 3px solid #22c55e;
-}
-
-.animated-video-status-failed {
-  border-left: 3px solid #dc2626;
 }
 
 .status-pill-queued {

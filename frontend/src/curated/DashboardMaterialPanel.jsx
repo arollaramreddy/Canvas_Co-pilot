@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import AnimatedLessonPlayer from "../animated-lessons/AnimatedLessonPlayer";
 
 function formatStatus(status) {
   const value = String(status || "new").toLowerCase();
@@ -13,37 +12,13 @@ function normalizeSlides(lesson) {
   return Array.isArray(lesson?.slides) ? lesson.slides : [];
 }
 
-function AnimatedVideoStatus({ job }) {
-  if (!job) return null;
-  const status = String(job.status || "queued").toLowerCase();
-
-  const labels = {
-    queued: "Queued for rendering…",
-    rendering: "Rendering animated video…",
-    encoding: "Encoding video…",
-    ready: "Animated video is ready",
-    failed: "Animated video generation failed",
-  };
-
-  return (
-    <div className={`animated-video-status animated-video-status-${status}`}>
-      <div className="animated-video-status-header">
-        <span className={`status-pill status-pill-${status}`}>{status}</span>
-        <strong>{labels[status] || "Processing…"}</strong>
-      </div>
-      {job.progressMessage ? <p>{job.progressMessage}</p> : null}
-      {status === "failed" && job.error ? (
-        <p className="animated-video-error">{job.error}</p>
-      ) : null}
-    </div>
-  );
-}
-
 function LessonStage({ lesson, autoPlay }) {
   const slides = useMemo(() => normalizeSlides(lesson), [lesson]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const audioRef = useRef(null);
+  const stageRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const activeSlide = slides[activeIndex] || null;
 
@@ -87,6 +62,30 @@ function LessonStage({ lesson, autoPlay }) {
     return () => audio.removeEventListener("ended", handleEnded);
   }, [slides.length]);
 
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === stageRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  async function toggleFullscreen() {
+    const stageNode = stageRef.current;
+    if (!stageNode) return;
+
+    try {
+      if (document.fullscreenElement === stageNode) {
+        await document.exitFullscreen();
+      } else {
+        await stageNode.requestFullscreen();
+      }
+    } catch {
+      setAudioBlocked(true);
+    }
+  }
+
   if (!slides.length) {
     return (
       <div className="material-video-shell">
@@ -100,12 +99,24 @@ function LessonStage({ lesson, autoPlay }) {
 
   return (
     <div className="material-video-shell">
-      <div className="material-video-stage">
+      <div
+        ref={stageRef}
+        className={`material-video-stage ${isFullscreen ? "material-video-stage-fullscreen" : ""}`}
+      >
         <div className="material-video-topbar">
-          <span className="material-video-badge">Narrated lesson</span>
-          <span className="material-video-counter">
-            Slide {activeIndex + 1} of {slides.length}
-          </span>
+          <div className="material-video-topbar-group">
+            <span className="material-video-badge">Narrated lesson</span>
+            <span className="material-video-counter">
+              Slide {activeIndex + 1} of {slides.length}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="agent-secondary material-video-fullscreen"
+            onClick={toggleFullscreen}
+          >
+            {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+          </button>
         </div>
 
         <div className="material-video-body">
@@ -159,8 +170,6 @@ export default function DashboardMaterialPanel({
   item,
   view = "summary",
   onRetry,
-  animatedVideoJob,
-  onStartAnimatedVideo,
 }) {
   if (!item) {
     return (
@@ -179,12 +188,6 @@ export default function DashboardMaterialPanel({
 
   const summary = item.summaryMarkdown || item.summaryPreview || "Summary is not ready yet.";
   const isReady = String(item.status) === "ready";
-  const hasSlides = Boolean(item.lesson?.slides?.length);
-
-  const animatedStatus = animatedVideoJob?.status || null;
-  const animatedReady = animatedStatus === "ready";
-  const animatedBusy = animatedStatus === "queued" || animatedStatus === "rendering" || animatedStatus === "encoding";
-
   return (
     <aside className="settings-panel">
       <div className="settings-header">
@@ -221,48 +224,7 @@ export default function DashboardMaterialPanel({
       ) : null}
 
       {view === "video" ? (
-        <>
-          {/* ── Normal video lesson ─────────────────── */}
-          <LessonStage lesson={item.lesson} autoPlay={isReady} />
-
-          {/* ── Animated video controls ─────────────── */}
-          {isReady && hasSlides ? (
-            <div className="animated-video-section">
-              <div className="section-header-inline">
-                <span className="section-tag">Animated Video Lesson</span>
-              </div>
-
-              {animatedReady && animatedVideoJob?.lessonPackage ? (
-                <AnimatedLessonPlayer
-                  lesson={animatedVideoJob.lessonPackage}
-                  autoPlayToken={1}
-                />
-              ) : animatedBusy ? (
-                <AnimatedVideoStatus job={animatedVideoJob} />
-              ) : animatedStatus === "failed" ? (
-                <>
-                  <AnimatedVideoStatus job={animatedVideoJob} />
-                  <button
-                    type="button"
-                    className="agent-primary"
-                    style={{ marginTop: 8 }}
-                    onClick={() => onStartAnimatedVideo?.(item)}
-                  >
-                    Retry Animated Video
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="agent-primary animated-video-btn"
-                  onClick={() => onStartAnimatedVideo?.(item)}
-                >
-                  Generate Animated Video Lesson
-                </button>
-              )}
-            </div>
-          ) : null}
-        </>
+        <LessonStage lesson={item.lesson} autoPlay={isReady} />
       ) : (
         <div className="workflow-section material-summary-panel">
           <span className="section-tag">Generated summary</span>

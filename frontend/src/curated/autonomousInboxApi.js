@@ -182,22 +182,8 @@ async function retryDashboardMaterial(itemId) {
   });
 }
 
-async function createAnimatedVideoJob(lesson, sourceFileId = null) {
-  return fetchJson("/generate-animated-lesson", {
-    method: "POST",
-    body: JSON.stringify({ lesson, sourceFileId }),
-  });
-}
-
-async function pollAnimatedVideoJob(jobId) {
-  return fetchJson(`/generate-animated-lesson/${encodeURIComponent(jobId)}`, {
-    headers: {},
-  });
-}
-
 export {
   buildFeed,
-  createAnimatedVideoJob,
   draftReply,
   loadDashboardMaterials,
   loadPreferences,
@@ -205,7 +191,6 @@ export {
   loadRuntimeState,
   loadStateEvents,
   messageMatchesUser,
-  pollAnimatedVideoJob,
   runAgenticWorkflow,
   runAutonomousMonitor,
   retryDashboardMaterial,

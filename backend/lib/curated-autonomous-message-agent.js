@@ -9,6 +9,12 @@ function normalizeName(value) {
     .trim();
 }
 
+function normalizeCompact(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
 function getReplyPreferences(preferences = {}) {
   const reply = preferences.reply || {};
   return {
@@ -116,6 +122,49 @@ function getCourseFacts(runtimeState, courseId = null) {
   };
 }
 
+function findMatchedAssignmentReference(message, runtimeState) {
+  const matchedCourse = deriveMessageCourseContext(message, runtimeState);
+  const courseFacts = getCourseFacts(runtimeState, matchedCourse?.id || null);
+  const sourceText = `${message?.subject || ""}\n${message?.last_message || ""}`;
+  const normalizedText = normalizeCompact(sourceText);
+  const expandedText = normalizeName(sourceText);
+
+  const gradedAssignments = courseFacts.gradedAssignments || [];
+  if (!gradedAssignments.length) {
+    return null;
+  }
+
+  const exactNameMatch = gradedAssignments.find((assignment) => {
+    const compactName = normalizeCompact(assignment.name);
+    return compactName && normalizedText.includes(compactName);
+  });
+  if (exactNameMatch) {
+    return exactNameMatch;
+  }
+
+  const numberedReference =
+    expandedText.match(/\b(?:homework|assignment|quiz|exam)\s*(\d+)\b/) ||
+    expandedText.match(/\b(?:hw)\s*(\d+)\b/);
+
+  if (numberedReference?.[1]) {
+    const wantedNumber = numberedReference[1];
+    const numberedMatches = gradedAssignments.filter((assignment) => {
+      const compactName = normalizeCompact(assignment.name);
+      const expandedName = normalizeName(assignment.name);
+      return (
+        compactName.includes(wantedNumber) &&
+        /(homework|assignment|quiz|exam|hw)/.test(expandedName)
+      );
+    });
+
+    if (numberedMatches.length === 1) {
+      return numberedMatches[0];
+    }
+  }
+
+  return null;
+}
+
 function classifyMessageIntent(message, runtimeState) {
   const subject = normalizeText(message?.subject).toLowerCase();
   const body = normalizeText(message?.last_message).toLowerCase();
@@ -162,6 +211,7 @@ function assessReplyContext(message, runtimeState, extraContext = "") {
   const courses = runtimeState?.canvas?.normalizedWorkspace?.courses || [];
   const matchedCourse = deriveMessageCourseContext(message, runtimeState);
   const courseFacts = getCourseFacts(runtimeState, matchedCourse?.id || null);
+  const matchedAssignment = findMatchedAssignmentReference(message, runtimeState);
   const missingContext = [];
   let clarificationQuestion = "";
 
@@ -175,7 +225,13 @@ function assessReplyContext(message, runtimeState, extraContext = "") {
     clarificationQuestion = clarificationQuestion || "What graded item or score are you asking about?";
   }
 
-  if (intent.asksForAssignment && !courseFacts.upcomingAssignments.length) {
+  if (intent.asksForGrade && courseFacts.gradedAssignments.length > 1 && !matchedAssignment) {
+    missingContext.push("grade_detail");
+    clarificationQuestion =
+      clarificationQuestion || "Which graded item should I mention?";
+  }
+
+  if (intent.asksForAssignment && !courseFacts.upcomingAssignments.length && !matchedAssignment) {
     missingContext.push("assignment_detail");
     clarificationQuestion = clarificationQuestion || "Which assignment, quiz, or due date should I mention?";
   }
@@ -199,6 +255,7 @@ function buildReplyDraftPrompt({ message, runtimeState, preferences = {}, extraC
   const matchedCourse = deriveMessageCourseContext(message, runtimeState);
   const courseFacts = getCourseFacts(runtimeState, matchedCourse?.id || null);
   const contextAssessment = assessReplyContext(message, runtimeState, extraContext);
+  const matchedAssignment = findMatchedAssignmentReference(message, runtimeState);
 
   return `You are an autonomous Canvas copilot drafting a reply for a student inbox message.
 
@@ -245,6 +302,21 @@ ${JSON.stringify(intent, null, 2)}
 Relevant Canvas state:
 ${JSON.stringify(courseFacts, null, 2)}
 
+Matched assignment reference:
+${JSON.stringify(
+    matchedAssignment
+      ? {
+          id: matchedAssignment.id,
+          name: matchedAssignment.name,
+          score: matchedAssignment.score,
+          points_possible: matchedAssignment.points_possible,
+          percent: matchedAssignment.percent,
+        }
+      : null,
+    null,
+    2
+  )}
+
 Matched course context:
 ${JSON.stringify(
     matchedCourse
@@ -270,6 +342,7 @@ Rules:
 - Never greet the student using their own name.
 - If the message is course-related, use the Canvas state when helpful.
 - If a course can be inferred from the message, use only that course context.
+- If a specific graded item can be matched from the message, answer directly instead of asking a clarification question.
 - If no exact fact is available, avoid inventing details.
 - If the context assessment says clarification is needed, return requiresClarification: true, ask one short question, leave the draft empty, and list the missing context.
 - Match the reply preferences closely.
@@ -314,6 +387,7 @@ module.exports = {
   buildReplyDraftPrompt,
   classifyMessageIntent,
   deriveMessageCourseContext,
+  findMatchedAssignmentReference,
   getCourseFacts,
   getReplyPreferences,
 };

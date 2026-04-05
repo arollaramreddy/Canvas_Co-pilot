@@ -39,6 +39,7 @@ const {
   buildReplyDraftPrompt,
   classifyMessageIntent,
   deriveMessageCourseContext,
+  findMatchedAssignmentReference,
   getCourseFacts,
 } = require("./lib/curated-autonomous-message-agent");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
@@ -650,20 +651,9 @@ function buildFallbackMessageDraft(message, runtimeState) {
   const intent = classifyMessageIntent(message, runtimeState);
   const matchedCourse = deriveMessageCourseContext(message, runtimeState);
   const courseFacts = getCourseFacts(runtimeState, matchedCourse?.id || null);
-  const text = `${message?.subject || ""}\n${message?.last_message || ""}`;
-  const normalizedText = normalizeMatchText(text);
-
   const matchedAssignment =
-    courseFacts.gradedAssignments.find((assignment) => {
-      const normalizedName = normalizeMatchText(assignment.name);
-      return normalizedName && normalizedText.includes(normalizedName);
-    }) ||
-    courseFacts.gradedAssignments.find((assignment) => {
-      const digitMatch = normalizedText.match(/assignment(\d+)/);
-      return digitMatch ? normalizeMatchText(assignment.name).includes(digitMatch[1]) : false;
-    }) ||
-    courseFacts.gradedAssignments[0] ||
-    null;
+    findMatchedAssignmentReference(message, runtimeState) ||
+    (courseFacts.gradedAssignments.length === 1 ? courseFacts.gradedAssignments[0] : null);
 
   let draft = "Hi, I just checked Canvas and I’ll follow up with the details shortly.";
   const usedState = [];
@@ -2786,6 +2776,24 @@ app.post("/api/messages/:messageId/draft-reply", async (req, res) => {
       payload = safeJsonParseObject(extractResponseText(response) || "");
     } catch {
       payload = buildFallbackMessageDraft(message, runtimeState);
+    }
+
+    const directFallback = buildFallbackMessageDraft(message, runtimeState);
+    if (
+      classifyMessageIntent(message, runtimeState).asksForGrade &&
+      directFallback?.draft &&
+      !/confirm which assignment or grade/i.test(directFallback.draft) &&
+      (
+        payload?.requiresClarification ||
+        !String(payload?.draft || "").trim()
+      )
+    ) {
+      payload = {
+        ...directFallback,
+        requiresClarification: false,
+        clarificationQuestion: "",
+        missingContext: [],
+      };
     }
 
     res.json({

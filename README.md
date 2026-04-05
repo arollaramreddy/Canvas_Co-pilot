@@ -1,100 +1,139 @@
 # Canvas Co-Pilot
 
-Canvas Co-Pilot turns Canvas from a passive course portal into an active learning assistant.
+Canvas Co-Pilot turns Canvas from a passive course portal into an active academic support system. Instead of forcing students to constantly check for changes, interpret grades, read every file manually, and decide what to study next, the platform monitors course state, understands what changed, and generates useful learning support automatically.
 
-Traditional Canvas workflows make students do the orchestration themselves: check for changes, read long PDFs, interpret grades, decide what to study, and figure out which resources matter most. Canvas Co-Pilot changes that by continuously monitoring course state, understanding what changed, and coordinating AI agents to take helpful actions automatically.
+## Demo
 
-Instead of only showing assignments, grades, and materials, the system can:
+- Demo video: https://youtu.be/w_5ZtJjuY3o
+- Live app: https://canvas-copilot-frontend-595493608856.us-central1.run.app/
+
+## Problem
+
+Students spend too much time managing coursework before they even start learning.
+
+Pain points we targeted:
+
+- checking Canvas repeatedly for new content
+- reading long PDFs and slides end to end
+- understanding why grades dropped
+- figuring out what to study next
+- converting raw course material into something actually useful for revision
+
+Canvas Co-Pilot reduces that overhead by turning course updates into guided study actions.
+
+## Solution
+
+Canvas Co-Pilot is a multi-agent study assistant built around Canvas LMS data.
+
+It can:
 
 - detect newly posted course content
-- summarize and explain materials
-- generate flashcards, quizzes, and study plans
-- create lesson/video plans
-- react to low scores with targeted recovery support
-- let students switch between autonomous and manual workflows
+- summarize materials in a more learnable format
+- generate flashcards and quizzes
+- create structured study plans
+- generate lesson and video-style learning flows
+- react to performance signals such as weak grades
+- support both autonomous workflows and manual student requests
 
-In short, it turns Canvas into an active academic support layer.
+The result is a system that moves students from "something changed" to "here is exactly what to do next."
 
-## What Problem It Solves
+## Key Features
 
-Students usually lose time on course management before they even start learning:
+- Autonomous mode that watches Canvas state and decides when help is needed
+- Manual mode where students can directly generate quizzes, flashcards, study plans, and lesson flows
+- Multi-agent workflow with specialized agents for parsing, summarization, quizzes, flashcards, video planning, and intervention
+- Personalized outputs shaped by course content and student preferences
+- Audio-backed lesson experience for guided study playback
 
-- searching for what changed in a course
-- reading dense slides and PDFs end to end
-- figuring out why a score dropped
-- deciding what to study next
-- turning raw content into practice material
+## Tech Stack
 
-Canvas Co-Pilot reduces that overhead.
+### Frontend
 
-When new material appears, it can read, summarize, and prepare follow-up learning assets.
+- React 19
+- Vite
+- Framer Motion
+- CSS
 
-When grades are released, it can inspect performance signals, identify weak areas, and generate recovery artifacts such as:
+### Backend
 
-- focused summaries
-- targeted videos or lesson plans
-- quizzes and flashcards
-- structured study plans
+- Node.js
+- Express
+- dotenv
 
-This gives students a clearer path from “something changed” to “here is what to do next.”
+### AI and Agent Orchestration
 
-## Core Product Model
+- LangGraph
+- LangChain Core
+- Gemini API
+- OpenAI-compatible API support
+
+### Data and Storage
+
+- SQLite
+- JSON file storage for saved artifacts
+
+### External Integrations
+
+- Canvas LMS API
+- ElevenLabs for lesson narration audio
+- Pexels for visual/media support
+
+## How It Works
 
 Canvas Co-Pilot supports two operating modes.
 
 ### Autonomous Mode
 
-The system runs in the background like a monitoring and intervention layer:
+The system acts like a monitoring and intervention layer:
 
-1. watch Canvas state
+1. fetch Canvas state
 2. detect meaningful changes
 3. decide which workflow should run
 4. coordinate multiple agents
-5. return support artifacts to the student UI
+5. return learning artifacts to the UI
 
-This is the mode for continuous support.
+This mode is designed for continuous support without requiring the student to manually orchestrate every step.
 
 ### Manual Mode
 
-The student can explicitly open courses, modules, files, and workflows and request outputs directly, such as:
+Students can directly open courses, modules, files, and workflows and request outputs such as:
 
 - flashcards
 - quizzes
 - study plans
-- lesson/video generation
+- lesson and video flows
 
-This is the mode for direct control.
+This mode gives students direct control while still using the same backend intelligence.
 
 ## Architecture
 
-The project is a full-stack monorepo with a React frontend and a Node/Express backend.
+The project is a full-stack monorepo:
 
 ```text
-frontend/   React + Vite application
+frontend/   React + Vite student interface
 backend/    Express API, Canvas integration, LangGraph orchestration, storage
 ```
 
 ### Frontend
 
-The frontend provides the student-facing workspace.
-
-Main areas include:
+The frontend provides the student-facing workspace, including:
 
 - autonomous workflow dashboard
 - study plan workspace
 - quiz workspace
 - manual student interaction workspace
+- lesson player experience
 
 Important files:
 
-- [App.jsx](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/frontend/src/App.jsx)
-- [ManualStudentInteractionView.jsx](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/frontend/src/manual/ManualStudentInteractionView.jsx)
-- [StudyPlanWorkspace.jsx](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/frontend/src/study-plan/StudyPlanWorkspace.jsx)
-- [QuizWorkspace.jsx](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/frontend/src/quiz/QuizWorkspace.jsx)
+- [frontend/src/App.jsx](frontend/src/App.jsx)
+- [frontend/src/manual/ManualStudentInteractionView.jsx](frontend/src/manual/ManualStudentInteractionView.jsx)
+- [frontend/src/study-plan/StudyPlanWorkspace.jsx](frontend/src/study-plan/StudyPlanWorkspace.jsx)
+- [frontend/src/quiz/QuizWorkspace.jsx](frontend/src/quiz/QuizWorkspace.jsx)
 
 ### Backend
 
-The backend is the coordination layer between Canvas, AI services, workflow state, and the frontend.
+The backend coordinates Canvas, workflow state, AI services, and artifact generation.
 
 Main responsibilities:
 
@@ -103,17 +142,17 @@ Main responsibilities:
 - store runtime data and user preferences
 - run AI-powered workflows
 - coordinate LangGraph-based agent execution
-- generate lesson audio and video artifacts
+- generate lesson audio and video-related outputs
 
 Important files:
 
-- [server.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/server.js)
-- [db.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/lib/db.js)
-- [langgraph-runtime.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/lib/langgraph-runtime.js)
+- [backend/server.js](backend/server.js)
+- [backend/lib/db.js](backend/lib/db.js)
+- [backend/lib/langgraph-runtime.js](backend/lib/langgraph-runtime.js)
 
 ## Agentic Workflow
 
-The agent system is built around a central orchestrator and a shared runtime state.
+The agent system is built around a central orchestrator and shared runtime state.
 
 High-level flow:
 
@@ -121,79 +160,49 @@ High-level flow:
 2. A change-detection layer determines whether something meaningful happened.
 3. The orchestrator selects which agents should run.
 4. Agents exchange outputs through shared workflow state.
-5. The frontend receives a coherent result instead of many disconnected tool calls.
+5. The frontend receives a coherent result instead of disconnected tool calls.
 
-The main orchestrator and agent registry live in:
+Main orchestration files:
 
-- [agent-6-orchestrator.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-6-orchestrator.js)
-- [index.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/index.js)
-- [runtime-state-contract.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/contracts/runtime-state-contract.js)
+- [backend/agents/agentic-workflow/agent-6-orchestrator.js](backend/agents/agentic-workflow/agent-6-orchestrator.js)
+- [backend/agents/agentic-workflow/index.js](backend/agents/agentic-workflow/index.js)
+- [backend/agents/agentic-workflow/contracts/runtime-state-contract.js](backend/agents/agentic-workflow/contracts/runtime-state-contract.js)
 
 ### Agent Roles
 
-The system is organized as specialized agents with bounded responsibilities.
-
 #### Agent 1: Parse and Research
 
-- reads selected topic/module content
+- reads selected topic or module content
 - grounds the workflow in source material
 - prepares the content package for downstream agents
-
-File:
-- [agent-1-parse-and-research.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-1-parse-and-research.js)
 
 #### Agent 2: Summarize by Preference
 
 - adapts explanations to student preferences
-- converts raw source material into a more learnable form
-
-File:
-- [agent-2-summarize-by-preference.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-2-summarize-by-preference.js)
+- converts raw source material into a more learnable format
 
 #### Agent 3: Create Flashcards
 
 - transforms summary content into recall-oriented study cards
 
-File:
-- [agent-3-create-flashcards.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-3-create-flashcards.js)
-
 #### Agent 4: Create Quizzes
 
 - generates checks-for-understanding from the learning package
 
-File:
-- [agent-4-create-quizzes.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-4-create-quizzes.js)
-
 #### Agent 5: Create Video Plan
 
-- prepares a lesson/video-oriented explanation structure
+- prepares a lesson or video-oriented explanation structure
 - organizes examples, scenarios, and teaching cues
-
-File:
-- [agent-5-create-video-plan.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-5-create-video-plan.js)
 
 #### Agent 6: Create Study Plan
 
-- turns deadlines, scope, and learning needs into study sessions and milestones
-
-File:
-- [agent-6-create-study-plan.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-6-create-study-plan.js)
+- turns deadlines, scope, and learning needs into sessions and milestones
 
 #### Agent 7: State Change Decider
 
 - detects important Canvas events
 - decides what workflow should run next
-- acts like the policy layer for autonomous behavior
-
-Examples of handled events:
-
-- new material posted
-- grade released
-- missing assignment detected
-- new message received
-
-File:
-- [agent-7-state-change-decider.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-7-state-change-decider.js)
+- acts as the policy layer for autonomous behavior
 
 #### Agent 8: Grade Intervention
 
@@ -201,31 +210,42 @@ File:
 - identifies recovery direction
 - triggers reinforcement and study-plan support
 
-File:
-- [agent-8-grade-intervention.js](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/agent-8-grade-intervention.js)
+For a deeper breakdown, see:
 
-## How The Agents Communicate
+- [backend/agents/agentic-workflow/README.md](backend/agents/agentic-workflow/README.md)
 
-The agents do not operate as isolated scripts. They communicate through shared runtime state and orchestrated handoffs.
+## Why This Is Hackathon-Worthy
 
-At a high level:
+- It reframes LMS platforms from passive dashboards into active support systems.
+- It combines real educational workflow pain points with agent-based decision making.
+- It goes beyond summarization and builds actionable outputs such as quizzes, plans, and guided lessons.
+- It blends automation with student control instead of forcing a one-mode experience.
 
-- Canvas data is normalized into `runtimeState`
-- student memory and preferences are attached to that state
-- each agent reads the parts of state it needs
-- each agent writes a structured result
-- later agents consume prior results
-- the orchestrator decides ordering, dependencies, and fan-out/fan-in
+## What We Built During The Hackathon
 
-This gives the system three important properties:
+- Canvas course and content ingestion
+- manual and autonomous workflow modes
+- multi-agent orchestration for study support generation
+- quiz, flashcard, study-plan, and lesson generation
+- audio-backed lesson playback experience
+- backend persistence for saved artifacts and preferences
 
-- stateful reasoning across the workflow
-- specialization by agent role
-- coordinated output instead of fragmented responses
+## Challenges We Ran Into
 
-For a deeper technical breakdown, see:
+- integrating with Canvas using a practical authentication flow without institutional OAuth setup
+- coordinating multiple agents while keeping outputs structured and state-aware
+- converting raw course data into workflows that feel genuinely useful to students
+- generating and playing lesson audio reliably inside browser autoplay restrictions
+- balancing autonomous behavior with manual user control
 
-- [backend/agents/agentic-workflow/README.md](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/agents/agentic-workflow/README.md)
+## Future Work
+
+- institutional OAuth instead of Canvas Personal Access Token login
+- stronger personalization based on long-term student learning history
+- push notifications and proactive reminders for high-priority course changes
+- broader autonomous intervention workflows for grades, deadlines, and missing work
+- richer lesson generation with stronger visuals and more adaptive pacing
+- mobile-first delivery experience
 
 ## Authentication
 
@@ -236,7 +256,7 @@ That means:
 - a student logs in with a Canvas token through the UI
 - the backend uses that token to fetch Canvas data
 
-This approach is used because full institutional SSO/OAuth approval typically requires admin access and configuration.
+This approach was used because full institutional SSO and OAuth approval typically requires admin-level setup.
 
 ## Storage
 
@@ -244,13 +264,13 @@ The backend currently uses a mix of:
 
 - SQLite for runtime and preference data
 - JSON files for some saved study-plan and quiz state
-- generated asset directories for lesson audio/video outputs
+- generated asset directories for lesson audio and video outputs
 
 Important files:
 
-- [copilot.db](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/data/copilot.db)
-- [study-plans.json](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/data/study-plans.json)
-- [quizzes.json](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/data/quizzes.json)
+- [backend/data/copilot.db](backend/data/copilot.db)
+- [backend/data/study-plans.json](backend/data/study-plans.json)
+- [backend/data/quizzes.json](backend/data/quizzes.json)
 
 ## Local Setup
 
@@ -265,11 +285,12 @@ npm run install:frontend
 
 ### 2. Configure environment variables
 
-Create [backend/.env](/Users/ramreddy/Documents/github/hackathons/innovationHacks3April2026/sparkling_papaya/backend/.env) with values like:
+Create `backend/.env` with values like:
 
 ```env
 CANVAS_BASE_URL=https://canvas.asu.edu/api/v1
 OPENAI_API_KEY=your_openai_api_key
+GEMINI_API_KEY=your_gemini_api_key
 ELEVENLABS_API_KEY=your_elevenlabs_api_key
 FRONTEND_URL=http://localhost:5173
 BACKEND_URL=http://localhost:3001
@@ -279,6 +300,7 @@ Optional variables can include:
 
 - `ELEVENLABS_VOICE_ID`
 - `ELEVENLABS_MODEL_ID`
+- `PEXELS_API_KEY`
 - `HOST`
 - `PORT`
 
@@ -303,7 +325,7 @@ npm run dev:frontend
 App URLs:
 
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:3001`
+- Backend API: `http://127.0.0.1:3001`
 
 ## Production Build Commands
 
@@ -314,16 +336,12 @@ npm run build
 npm run lint
 ```
 
+## Team
+
+- Niharika Ravilla
+- Ram Reddy
+- Suraj Shinde 
+
 ## Summary
 
-Canvas Co-Pilot is not just a Canvas dashboard.
-
-It is a multi-agent student support system that:
-
-- watches course activity
-- understands changes
-- decides what action is needed
-- generates learning support automatically
-- still allows manual control when students want it
-
-The result is a system that reduces course-management overhead and helps students spend more time actually learning.
+Canvas Co-Pilot is not just a Canvas dashboard. It is a multi-agent student support system that watches course activity, understands changes, decides what action is needed, and generates learning support automatically while still allowing manual control when students want it.

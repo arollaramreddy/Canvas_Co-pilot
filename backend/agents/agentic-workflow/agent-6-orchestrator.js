@@ -8,6 +8,7 @@ const { runCreateQuizzesAgent } = require("./agent-4-create-quizzes");
 const { runCreateVideoPlanAgent } = require("./agent-5-create-video-plan");
 const { runCreateStudyPlanAgent } = require("./agent-6-create-study-plan");
 const { runStateChangeDeciderAgent } = require("./agent-7-state-change-decider");
+const { runGradeInterventionAgent } = require("./agent-8-grade-intervention");
 
 const AgentWorkflowState = Annotation.Root({
   runtimeState: Annotation(),
@@ -35,6 +36,7 @@ function buildWorkflowGraph() {
             runtimeSummary: summarizeRuntimeState(state.runtimeState),
             requestedAgents: state.options?.requestedAgents || [
               "agent_7_state_change_decider",
+              "agent_8_grade_intervention",
               "agent_1_parse_and_research",
               "agent_2_summarize_by_preference",
               "agent_6_create_study_plan",
@@ -60,6 +62,15 @@ function buildWorkflowGraph() {
         agent_1_parse_and_research: await runParseAndResearchAgent({
           runtimeState: state.runtimeState,
           dependencies: state.options?.dependencies || {},
+        }),
+      },
+    }))
+    .addNode("agent_8_grade_intervention", async (state) => ({
+      results: {
+        ...state.results,
+        agent_8_grade_intervention: await runGradeInterventionAgent({
+          runtimeState: state.runtimeState,
+          previousResults: state.results,
         }),
       },
     }))
@@ -113,7 +124,7 @@ function buildWorkflowGraph() {
         agentId: "agent_8_orchestrator",
         agentName: "Agent 8: Orchestrator",
         status: "ready_for_team_implementation",
-        summary: "Completed the orchestrated workflow skeleton for state-aware decisions, parse, summarize, study plans, flashcards, quizzes, and video generation.",
+        summary: "Completed the orchestrated workflow skeleton for state-aware decisions, grade interventions, parse, summarize, study plans, flashcards, quizzes, and video generation.",
         outputs: {
           completedAgents: Object.keys(state.results || {}),
           nextStep:
@@ -123,7 +134,8 @@ function buildWorkflowGraph() {
     }))
     .addEdge(START, "orchestrator_boot")
     .addEdge("orchestrator_boot", "agent_7_state_change_decider")
-    .addEdge("agent_7_state_change_decider", "agent_1_parse_and_research")
+    .addEdge("agent_7_state_change_decider", "agent_8_grade_intervention")
+    .addEdge("agent_8_grade_intervention", "agent_1_parse_and_research")
     .addEdge("agent_1_parse_and_research", "agent_2_summarize_by_preference")
     .addEdge("agent_2_summarize_by_preference", "agent_6_create_study_plan")
     .addEdge("agent_6_create_study_plan", "agent_3_create_flashcards")

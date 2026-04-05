@@ -5,6 +5,7 @@ const { runCreateQuizzesAgent } = require("./agent-4-create-quizzes");
 const { runCreateVideoPlanAgent } = require("./agent-5-create-video-plan");
 const { runCreateStudyPlanAgent } = require("./agent-6-create-study-plan");
 const { runStateChangeDeciderAgent } = require("./agent-7-state-change-decider");
+const { runGradeInterventionAgent } = require("./agent-8-grade-intervention");
 const { buildWorkflowGraph, runAgenticWorkflowScaffold } = require("./agent-6-orchestrator");
 
 const AGENT_REGISTRY = [
@@ -51,8 +52,14 @@ const AGENT_REGISTRY = [
     responsibility: "Watch Canvas state changes and performance signals, then decide what support workflow should happen next.",
   },
   {
-    id: "agent_8_orchestrator",
-    name: "Agent 8: Orchestrator",
+    id: "agent_8_grade_intervention",
+    name: "Agent 8: Grade Intervention",
+    file: "agent-8-grade-intervention.js",
+    responsibility: "Interpret new assignment or exam scores, explain likely improvement areas, trigger curated video support, and adjust the study plan.",
+  },
+  {
+    id: "agent_9_orchestrator",
+    name: "Agent 9: Orchestrator",
     file: "agent-6-orchestrator.js",
     responsibility: "Orchestrate the full agentic workflow.",
   },
@@ -63,6 +70,7 @@ module.exports = {
   buildWorkflowGraph,
   runAgenticWorkflowScaffold,
   runStateChangeDeciderAgent,
+  runGradeInterventionAgent,
   runCreateStudyPlanAgent,
   runCreateFlashcardsAgent,
   runCreateQuizzesAgent,

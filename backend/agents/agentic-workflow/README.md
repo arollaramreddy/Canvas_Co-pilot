@@ -25,6 +25,10 @@ Agents:
   - monitor Canvas state changes and performance signals
   - decide whether the student needs recovery, reinforcement, advancement, or message support
   - recommend the next agents to run when a grade, missing assignment, message, or new material appears
+- `agent-8-grade-intervention.js`
+  - react to assignment or exam score changes
+  - explain what likely went wrong and where the student can improve
+  - generate a curated video-learning brief and automatic study-plan adjustment
 - `agent-6-orchestrator.js`
   - LangGraph orchestrator for the full workflow
 

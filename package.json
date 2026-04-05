@@ -1,0 +1,15 @@
+{
+  "name": "sparkling-papaya",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Canvas Study Assistant monorepo",
+  "scripts": {
+    "install:frontend": "npm --prefix frontend install",
+    "install:backend": "npm --prefix backend install",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "start:backend": "npm --prefix backend run start",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint"
+  }
+}

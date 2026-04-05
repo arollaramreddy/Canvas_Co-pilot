@@ -292,3 +292,134 @@
     justify-content: flex-start;
   }
 }
+
+.autonomous-hero,
+.autonomous-column,
+.settings-panel,
+.agent-card,
+.empty-card,
+.workflow-section,
+.hero-stat {
+  background:
+    linear-gradient(180deg, rgba(23, 23, 30, 0.9), rgba(14, 14, 18, 0.86));
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.autonomous-hero h2,
+.section-header h3,
+.settings-header h3,
+.agent-card h3,
+.empty-card h3,
+.workflow-section h4,
+.hero-stat strong {
+  color: var(--text-1);
+}
+
+.autonomous-hero p,
+.agent-card p,
+.empty-card p,
+.workflow-section p,
+.workflow-text,
+.workflow-line span,
+.hero-stat span,
+.agent-time,
+.agent-meta-row span {
+  color: var(--text-2);
+}
+
+.hero-chip,
+.section-tag,
+.settings-tag,
+.agent-pill {
+  background: rgba(139, 92, 246, 0.14);
+  color: #d7cbff;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+}
+
+.agent-intent-grid span {
+  background: rgba(59, 130, 246, 0.12);
+  color: #cfe2ff;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+}
+
+.agent-clarification-box {
+  background: rgba(34, 211, 238, 0.08);
+  border-color: rgba(34, 211, 238, 0.16);
+}
+
+.agent-clarification-box strong {
+  color: #cffafe;
+}
+
+.agent-clarification-input,
+.settings-field select {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-1);
+}
+
+.agent-primary {
+  background: linear-gradient(135deg, #7c3aed, #d946ef 34%, #2563eb 68%, #22d3ee 100%);
+  color: #ffffff;
+  box-shadow: 0 18px 34px rgba(59, 130, 246, 0.18);
+}
+
+.agent-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #dbe7ff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.material-card-active {
+  border-color: rgba(34, 211, 238, 0.28);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+}
+
+:root[data-theme="light"] .autonomous-hero,
+:root[data-theme="light"] .autonomous-column,
+:root[data-theme="light"] .settings-panel,
+:root[data-theme="light"] .agent-card,
+:root[data-theme="light"] .empty-card,
+:root[data-theme="light"] .workflow-section,
+:root[data-theme="light"] .hero-stat {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(20, 33, 51, 0.08);
+  box-shadow: 0 18px 40px rgba(20, 33, 51, 0.08);
+}
+
+:root[data-theme="light"] .autonomous-hero h2,
+:root[data-theme="light"] .section-header h3,
+:root[data-theme="light"] .settings-header h3,
+:root[data-theme="light"] .agent-card h3,
+:root[data-theme="light"] .empty-card h3,
+:root[data-theme="light"] .workflow-section h4,
+:root[data-theme="light"] .hero-stat strong {
+  color: #142133;
+}
+
+:root[data-theme="light"] .autonomous-hero p,
+:root[data-theme="light"] .agent-card p,
+:root[data-theme="light"] .empty-card p,
+:root[data-theme="light"] .workflow-section p,
+:root[data-theme="light"] .workflow-text,
+:root[data-theme="light"] .workflow-line span,
+:root[data-theme="light"] .hero-stat span,
+:root[data-theme="light"] .agent-time,
+:root[data-theme="light"] .agent-meta-row span {
+  color: #607086;
+}
+
+:root[data-theme="light"] .agent-clarification-input,
+:root[data-theme="light"] .settings-field select,
+:root[data-theme="light"] .agent-secondary {
+  background: #ffffff;
+  color: #142133;
+  border-color: #d0d5dd;
+}
+
+:root[data-theme="light"] .agent-primary {
+  color: #ffffff;
+}

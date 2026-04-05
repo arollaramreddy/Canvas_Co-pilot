@@ -6,6 +6,23 @@
   color: #142133;
 }
 
+.manual-motion-target {
+  opacity: 0;
+  transform: translate3d(0, 16px, 0) scale(0.988);
+  filter: blur(8px);
+  transition:
+    opacity 680ms cubic-bezier(0.22, 1, 0.36, 1) var(--manual-motion-delay, 0ms),
+    transform 680ms cubic-bezier(0.22, 1, 0.36, 1) var(--manual-motion-delay, 0ms),
+    filter 680ms cubic-bezier(0.22, 1, 0.36, 1) var(--manual-motion-delay, 0ms);
+  will-change: transform, opacity, filter;
+}
+
+.manual-motion-target.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+}
+
 .manual-shell {
   display: flex;
   flex-direction: column;
@@ -97,6 +114,8 @@
 
 .manual-card {
   padding: 22px;
+  position: relative;
+  overflow: hidden;
 }
 
 .manual-course-card {
@@ -111,6 +130,17 @@
 .manual-course-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 24px 44px rgba(20, 33, 51, 0.12);
+}
+
+.manual-course-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -30% -55% auto;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(217, 70, 239, 0.14), transparent 72%);
+  pointer-events: none;
 }
 
 .manual-course-banner {
@@ -639,6 +669,13 @@
   margin-top: 18px;
 }
 
+.manual-agent-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.8fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .manual-agent-target {
   text-align: left;
   border: 1px solid #d7dfe8;
@@ -651,6 +688,32 @@
   flex-direction: column;
   gap: 6px;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.manual-agent-target-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.manual-agent-target-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(96, 112, 134, 0.12);
+  color: #607086;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.manual-agent-target-state.ready {
+  background: rgba(15, 118, 110, 0.14);
+  color: #0f766e;
 }
 
 .manual-agent-target:hover {
@@ -671,6 +734,120 @@
 .manual-agent-target span {
   color: #607086;
   font-size: 0.9rem;
+}
+
+.manual-agent-control-panel {
+  border: 1px solid #d7dfe8;
+  background:
+    radial-gradient(circle at top right, rgba(255, 205, 145, 0.24), transparent 28%),
+    linear-gradient(180deg, #ffffff, #f7faff);
+  border-radius: 22px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 16px 34px rgba(20, 33, 51, 0.06);
+}
+
+.manual-agent-control-orbit {
+  margin: -4px 0 2px;
+  pointer-events: none;
+}
+
+.manual-agent-control-svg {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 18px 28px rgba(20, 33, 51, 0.1));
+}
+
+.manual-agent-orbit-ring {
+  stroke-dasharray: 420;
+  stroke-dashoffset: 420;
+  animation: manualOrbitReveal 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    manualOrbitSpin 16s linear 2.4s infinite;
+  transform-origin: center;
+}
+
+.manual-agent-orbit-ring-alt {
+  animation-duration: 2s, 12s;
+  animation-direction: normal, reverse;
+}
+
+.manual-agent-orbit-node {
+  transform-origin: center;
+  animation: manualOrbitNodePulse 3.6s ease-in-out infinite;
+}
+
+.manual-agent-orbit-node-b {
+  animation-delay: 0.4s;
+}
+
+.manual-agent-orbit-node-c {
+  animation-delay: 0.8s;
+}
+
+.manual-agent-control-kicker {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8b1e3f;
+}
+
+.manual-agent-control-panel h4 {
+  margin: 0;
+  color: #142133;
+}
+
+.manual-agent-control-panel p {
+  margin: 0;
+  color: #607086;
+}
+
+.manual-agent-control-actions {
+  margin-top: 4px;
+}
+
+.manual-agent-control-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #607086;
+  font-size: 0.92rem;
+}
+
+@keyframes manualOrbitReveal {
+  from {
+    stroke-dashoffset: 420;
+    opacity: 0.35;
+  }
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+@keyframes manualOrbitSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes manualOrbitNodePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+  }
+  50% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.52));
+  }
 }
 
 .manual-agent-grid {
@@ -1623,6 +1800,10 @@
     grid-template-columns: 1fr;
   }
 
+  .manual-agent-layout {
+    grid-template-columns: 1fr;
+  }
+
   .manual-study-plan-grid {
     grid-template-columns: 1fr;
   }
@@ -1651,4 +1832,230 @@
   .manual-lesson-stage {
     padding: 24px 20px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .manual-motion-target,
+  .manual-course-card::after,
+  .manual-agent-orbit-ring,
+  .manual-agent-orbit-node {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+}
+
+.manual-workspace,
+.manual-header-copy p,
+.manual-muted,
+.manual-course-meta,
+.manual-section-kicker,
+.manual-empty,
+.manual-search-meta,
+.manual-summary-content,
+.manual-extract-meta,
+.manual-lesson-meta,
+.manual-table td,
+.manual-table th {
+  color: var(--text-2);
+}
+
+.manual-card,
+.manual-course-card,
+.manual-course-detail,
+.manual-file-card,
+.manual-note,
+.manual-lesson-panel,
+.manual-module-item {
+  background: linear-gradient(180deg, rgba(23, 23, 30, 0.9), rgba(14, 14, 18, 0.86));
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.manual-module-item {
+  color: var(--text-1);
+}
+
+.manual-module-item.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.24), rgba(37, 99, 235, 0.18));
+  border-color: rgba(34, 211, 238, 0.24);
+}
+
+.manual-card-title,
+.manual-detail-title,
+.manual-course-name,
+.manual-module-name,
+.manual-file-title,
+.manual-summary-panel h4,
+.manual-study-preferences-header h4,
+.manual-agent-control-panel h4,
+.manual-toolbar h4,
+.manual-toolbar h3,
+.manual-header-copy h2 {
+  color: var(--text-1);
+}
+
+.manual-btn,
+.manual-back-btn,
+.manual-mode-chip,
+.manual-semester-tab,
+.manual-search-input,
+.manual-study-field select,
+.manual-study-field input,
+.manual-table-wrap,
+.manual-extract-text {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.manual-btn.primary,
+.manual-semester-tab.active,
+.manual-mode-chip.active {
+  background: linear-gradient(135deg, #7c3aed, #2563eb 50%, #22d3ee 100%);
+  box-shadow:
+    0 18px 34px rgba(59, 130, 246, 0.2),
+    0 0 24px rgba(139, 92, 246, 0.16);
+  color: #ffffff;
+}
+
+.manual-agent-target,
+.manual-agent-control-panel,
+.manual-agent-item,
+.manual-quiz-card,
+.manual-study-plan-block,
+.feature-result-item,
+.feature-day-card,
+.feature-week-card,
+.feature-library-card,
+.feature-card {
+  background: linear-gradient(180deg, rgba(25, 25, 34, 0.9), rgba(15, 15, 21, 0.88));
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-1);
+}
+
+.manual-agent-target span,
+.manual-agent-control-panel p,
+.manual-agent-control-meta,
+.manual-quiz-feedback,
+.feature-subcopy,
+.feature-muted,
+.feature-library-card p,
+.feature-library-card span,
+.feature-result-item p,
+.feature-week-header p,
+.feature-day-header span,
+.feature-day-header small {
+  color: var(--text-2);
+}
+
+:root[data-theme="light"] .manual-workspace,
+:root[data-theme="light"] .manual-header-copy p,
+:root[data-theme="light"] .manual-muted,
+:root[data-theme="light"] .manual-course-meta,
+:root[data-theme="light"] .manual-section-kicker,
+:root[data-theme="light"] .manual-empty,
+:root[data-theme="light"] .manual-search-meta,
+:root[data-theme="light"] .manual-summary-content,
+:root[data-theme="light"] .manual-extract-meta,
+:root[data-theme="light"] .manual-lesson-meta,
+:root[data-theme="light"] .manual-table td,
+:root[data-theme="light"] .manual-table th {
+  color: #607086;
+}
+
+:root[data-theme="light"] .manual-card,
+:root[data-theme="light"] .manual-course-card,
+:root[data-theme="light"] .manual-course-detail,
+:root[data-theme="light"] .manual-file-card,
+:root[data-theme="light"] .manual-note,
+:root[data-theme="light"] .manual-lesson-panel,
+:root[data-theme="light"] .manual-module-item,
+:root[data-theme="light"] .manual-agent-target,
+:root[data-theme="light"] .manual-agent-control-panel,
+:root[data-theme="light"] .manual-agent-item,
+:root[data-theme="light"] .manual-quiz-card,
+:root[data-theme="light"] .manual-study-plan-block,
+:root[data-theme="light"] .feature-result-item,
+:root[data-theme="light"] .feature-day-card,
+:root[data-theme="light"] .feature-week-card,
+:root[data-theme="light"] .feature-library-card,
+:root[data-theme="light"] .feature-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(20, 33, 51, 0.08);
+  box-shadow: 0 18px 40px rgba(20, 33, 51, 0.08);
+}
+
+:root[data-theme="light"] .manual-module-item {
+  color: #213248;
+}
+
+:root[data-theme="light"] .manual-module-item.active {
+  background: linear-gradient(180deg, rgba(139, 30, 63, 0.08), rgba(139, 30, 63, 0.02));
+  border-color: rgba(139, 30, 63, 0.32);
+}
+
+:root[data-theme="light"] .manual-card-title,
+:root[data-theme="light"] .manual-detail-title,
+:root[data-theme="light"] .manual-course-name,
+:root[data-theme="light"] .manual-module-name,
+:root[data-theme="light"] .manual-file-title,
+:root[data-theme="light"] .manual-summary-panel h4,
+:root[data-theme="light"] .manual-study-preferences-header h4,
+:root[data-theme="light"] .manual-agent-control-panel h4,
+:root[data-theme="light"] .manual-toolbar h4,
+:root[data-theme="light"] .manual-toolbar h3,
+:root[data-theme="light"] .manual-header-copy h2,
+:root[data-theme="light"] .manual-agent-item strong,
+:root[data-theme="light"] .manual-quiz-question {
+  color: #142133;
+}
+
+:root[data-theme="light"] .manual-btn,
+:root[data-theme="light"] .manual-back-btn,
+:root[data-theme="light"] .manual-mode-chip,
+:root[data-theme="light"] .manual-semester-tab,
+:root[data-theme="light"] .manual-search-input,
+:root[data-theme="light"] .manual-study-field select,
+:root[data-theme="light"] .manual-study-field input,
+:root[data-theme="light"] .manual-table-wrap,
+:root[data-theme="light"] .manual-extract-text,
+:root[data-theme="light"] .manual-quiz-option {
+  background: #ffffff;
+  color: #213248;
+  border-color: #d7dfe8;
+}
+
+:root[data-theme="light"] .manual-agent-target span,
+:root[data-theme="light"] .manual-agent-control-panel p,
+:root[data-theme="light"] .manual-agent-control-meta,
+:root[data-theme="light"] .manual-quiz-feedback,
+:root[data-theme="light"] .feature-subcopy,
+:root[data-theme="light"] .feature-muted,
+:root[data-theme="light"] .feature-library-card p,
+:root[data-theme="light"] .feature-library-card span,
+:root[data-theme="light"] .feature-result-item p,
+:root[data-theme="light"] .feature-week-header p,
+:root[data-theme="light"] .feature-day-header span,
+:root[data-theme="light"] .feature-day-header small {
+  color: #607086;
+}
+
+:root[data-theme="light"] .manual-btn.primary,
+:root[data-theme="light"] .manual-semester-tab.active,
+:root[data-theme="light"] .manual-mode-chip.active,
+:root[data-theme="light"] .manual-study-day-chip.active,
+:root[data-theme="light"] .manual-lesson-control-btn,
+:root[data-theme="light"] .manual-lesson-control-btn.play {
+  color: #ffffff;
+}
+
+:root[data-theme="light"] .manual-study-day-chip,
+:root[data-theme="light"] .manual-agent-target-state,
+:root[data-theme="light"] .manual-quiz-option-key {
+  color: #213248;
 }

@@ -1,5 +1,6 @@
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const { db } = require("./lib/db");
 const { computeInterventionScore } = require("./lib/intelligence");

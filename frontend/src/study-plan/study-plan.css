@@ -472,3 +472,131 @@
     flex-direction: column;
   }
 }
+
+.feature-workspace {
+  color: var(--text-1);
+}
+
+.feature-header,
+.feature-card,
+.feature-week-card,
+.feature-day-card,
+.feature-library-card,
+.feature-result-item {
+  background:
+    linear-gradient(180deg, rgba(23, 23, 30, 0.9), rgba(14, 14, 18, 0.86));
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.feature-header h2,
+.feature-card h3,
+.feature-result-item strong,
+.feature-week-header h4,
+.feature-day-header strong {
+  color: var(--text-1);
+}
+
+.feature-header p,
+.feature-muted,
+.feature-result-item p,
+.feature-library-card p,
+.feature-library-card span,
+.feature-subcopy,
+.feature-week-header p,
+.feature-day-header span,
+.feature-day-header small {
+  color: var(--text-2);
+}
+
+.feature-panel-badge,
+.feature-mini-badge {
+  background: rgba(139, 92, 246, 0.14);
+  color: #d7cbff;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+}
+
+.feature-field span {
+  color: #dbe7ff;
+}
+
+.feature-field input,
+.feature-field select,
+.feature-task-row input {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-1);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.feature-chip,
+.feature-output-meta span {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.feature-chip.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.34), rgba(34, 211, 238, 0.2));
+  border-color: rgba(34, 211, 238, 0.22);
+  color: #f5f7ff;
+}
+
+.feature-status {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-2);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="light"] .feature-workspace {
+  color: #182538;
+}
+
+:root[data-theme="light"] .feature-header,
+:root[data-theme="light"] .feature-card,
+:root[data-theme="light"] .feature-week-card,
+:root[data-theme="light"] .feature-day-card,
+:root[data-theme="light"] .feature-library-card,
+:root[data-theme="light"] .feature-result-item {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.94));
+  border-color: rgba(20, 33, 51, 0.08);
+  box-shadow: 0 18px 40px rgba(20, 33, 51, 0.08);
+}
+
+:root[data-theme="light"] .feature-header h2,
+:root[data-theme="light"] .feature-card h3,
+:root[data-theme="light"] .feature-result-item strong,
+:root[data-theme="light"] .feature-week-header h4,
+:root[data-theme="light"] .feature-day-header strong,
+:root[data-theme="light"] .feature-field span {
+  color: #142133;
+}
+
+:root[data-theme="light"] .feature-header p,
+:root[data-theme="light"] .feature-muted,
+:root[data-theme="light"] .feature-result-item p,
+:root[data-theme="light"] .feature-library-card p,
+:root[data-theme="light"] .feature-library-card span,
+:root[data-theme="light"] .feature-subcopy,
+:root[data-theme="light"] .feature-week-header p,
+:root[data-theme="light"] .feature-day-header span,
+:root[data-theme="light"] .feature-day-header small {
+  color: #607086;
+}
+
+:root[data-theme="light"] .feature-field input,
+:root[data-theme="light"] .feature-field select,
+:root[data-theme="light"] .feature-task-row input,
+:root[data-theme="light"] .feature-chip,
+:root[data-theme="light"] .feature-output-meta span,
+:root[data-theme="light"] .feature-status {
+  background: rgba(255, 255, 255, 0.98);
+  color: #213248;
+  border-color: #d5dde7;
+}
+
+:root[data-theme="light"] .feature-chip.active,
+:root[data-theme="light"] .danger-button {
+  color: #ffffff;
+}

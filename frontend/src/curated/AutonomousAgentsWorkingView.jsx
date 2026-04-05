@@ -125,7 +125,7 @@ function MaterialCard({ item, onOpen, isActive }) {
         <p>{item.subtitle}</p>
         <div className="agent-actions">
           <button type="button" className="agent-primary" onClick={() => onOpen?.(item)}>
-            Open with agents
+            Open
           </button>
         </div>
       </div>
@@ -144,12 +144,12 @@ function MaterialWorkflowPanel({ selectedMaterial, materialWorkflow, materialLoa
       {!selectedMaterial ? (
         <div className="empty-card">
           <h3>No material selected</h3>
-          <p>Open a new professor-posted module or file to generate curated learning support.</p>
+          <p>Open a file to view outputs.</p>
         </div>
       ) : materialLoading ? (
         <div className="empty-card">
           <h3>Agents are working</h3>
-          <p>Agent 1 is grounding the material, Agent 2 is tailoring the summary, and Agent 5 is preparing the interactive video handoff.</p>
+          <p>Preparing learning support.</p>
         </div>
       ) : materialWorkflow ? (
         <div className="material-workflow-stack">
@@ -171,27 +171,27 @@ function MaterialWorkflowPanel({ selectedMaterial, materialWorkflow, materialLoa
             <div className="workflow-list">
               <div className="workflow-line">
                 <strong>Agent 1</strong>
-                <span>Parse professor material and gather supporting context.</span>
+                <span>Parse material.</span>
               </div>
               <div className="workflow-line">
                 <strong>Agent 2</strong>
-                <span>Summarize and tailor the explanation to the student preference.</span>
+                <span>Summarize.</span>
               </div>
               <div className="workflow-line">
                 <strong>Agent 3</strong>
-                <span>Turn the summary into quick recall flashcards.</span>
+                <span>Make flashcards.</span>
               </div>
               <div className="workflow-line">
                 <strong>Agent 4</strong>
-                <span>Generate quiz checks for understanding from the learning package.</span>
+                <span>Make quizzes.</span>
               </div>
               <div className="workflow-line">
                 <strong>Agent 5</strong>
-                <span>Prepare the interactive real-world video handoff for the video lesson workflow.</span>
+                <span>Prepare video plan.</span>
               </div>
               <div className="workflow-line">
                 <strong>Agent 6</strong>
-                <span>Refresh the study plan around deadlines and weak topics.</span>
+                <span>Refresh study plan.</span>
               </div>
             </div>
           </div>
@@ -211,14 +211,14 @@ function MaterialWorkflowPanel({ selectedMaterial, materialWorkflow, materialLoa
           <div className="workflow-section">
             <span className="section-tag">Video handoff</span>
             <div className="workflow-text">
-              {materialWorkflow.workflow?.assets?.video_plan?.reason || "Video agent handoff will plug in here."}
+              {materialWorkflow.workflow?.assets?.video_plan?.reason || "Video plan will appear here."}
             </div>
           </div>
         </div>
       ) : (
         <div className="empty-card">
           <h3>Ready to generate</h3>
-          <p>Open a posted material card and the existing agents will build curated learning support.</p>
+          <p>Open a file to start.</p>
         </div>
       )}
     </aside>
@@ -325,8 +325,8 @@ export default function AutonomousAgentsWorkingView({
       <div className="autonomous-hero">
         <div>
           <span className="hero-chip">Autonomous agents</span>
-          <h2>State changes arrive here</h2>
-          <p>Messages, grades, assignments, discussions, and new material should surface without manual searching.</p>
+          <h2>Live updates</h2>
+          <p>Messages, materials, and scores in one place.</p>
         </div>
         <div className="hero-stats">
           <div className="hero-stat">
@@ -344,7 +344,7 @@ export default function AutonomousAgentsWorkingView({
         <div className="autonomous-column">
           <div className="section-header">
             <span className="section-tag">New material</span>
-            <h3>Professor-posted modules and files</h3>
+            <h3>New materials</h3>
           </div>
 
           <div className="card-stack">
@@ -360,14 +360,14 @@ export default function AutonomousAgentsWorkingView({
             ) : (
               <div className="empty-card">
                 <h3>No new materials yet</h3>
-                <p>When a professor posts a new module or file, it will appear here with course and file context.</p>
+                <p>New files appear here.</p>
               </div>
             )}
           </div>
 
           <div className="section-header">
             <span className="section-tag">Inbox</span>
-            <h3>Reply-ready messages</h3>
+            <h3>Messages</h3>
           </div>
 
           <div className="card-stack">
@@ -382,8 +382,8 @@ export default function AutonomousAgentsWorkingView({
               ))
             ) : (
               <div className="empty-card">
-                <h3>No inbox changes yet</h3>
-                <p>The agent feed will place new course-aware messages here.</p>
+                <h3>No inbox changes</h3>
+                <p>New messages appear here.</p>
               </div>
             )}
           </div>

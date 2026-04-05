@@ -22,10 +22,11 @@ const LESSON_MODE_OPTIONS = [
 ];
 
 const AGENT_PACK_OPTIONS = [
-  { id: "quizzes", label: "Quizzes" },
-  { id: "flashcards", label: "Flashcards" },
-  { id: "video_plan", label: "Video plan" },
-  { id: "study_plan", label: "Study planner" },
+  {
+    id: "flashcards",
+    label: "Flashcards",
+    description: "Recall cards for review.",
+  },
 ];
 
 const STUDY_PLAN_CONFIG = {
@@ -297,7 +298,7 @@ function buildStudyPlannerViewModel(sessions = [], preferences = {}, overview = 
   return {
     overview:
       overview ||
-      "A study plan generated from the selected module materials and your planning preferences.",
+      "Generated from module content and your preferences.",
     weeklyPlan,
     milestones,
     dailySchedule,
@@ -346,11 +347,12 @@ function deadlineStatus(dateStr) {
   return null;
 }
 
-function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiBase }) {
+function LessonPlayer({ lesson, onClose, inline = false, apiBase }) {
   const [slideIndex, setSlideIndex] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [speechError, setSpeechError] = useState("");
   const [audioUrls, setAudioUrls] = useState({});
+  const [audioLoading, setAudioLoading] = useState({});
   const [muted, setMuted] = useState(false);
   const audioRef = useRef(null);
 
@@ -360,11 +362,13 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
   const progress = ((slideIndex + 1) / lesson.slides.length) * 100;
 
   useEffect(() => {
-    if (!slide?.id || !slide?.narration) return undefined;
     let cancelled = false;
 
-    async function ensureAudioForSlide() {
-      if (audioUrls[slide.id]) return;
+    async function ensureAudioForSlide(targetSlide) {
+      if (!targetSlide?.id || !targetSlide?.narration) return;
+      if (audioUrls[targetSlide.id] || audioLoading[targetSlide.id]) return;
+
+      setAudioLoading((current) => ({ ...current, [targetSlide.id]: true }));
 
       try {
         const response = await fetch(`${apiBase}/generate-lesson-audio`, {
@@ -375,8 +379,8 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
           },
           body: JSON.stringify({
             lessonTitle: lesson.title,
-            slideId: slide.id,
-            narration: slide.narration,
+            slideId: targetSlide.id,
+            narration: targetSlide.narration,
           }),
         });
 
@@ -384,22 +388,31 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
         if (!response.ok) {
           throw new Error(data.error || "Failed to generate lesson audio");
         }
+
         if (!cancelled) {
-          setAudioUrls((current) => ({ ...current, [slide.id]: data.audioUrl }));
+          setAudioUrls((current) => ({ ...current, [targetSlide.id]: data.audioUrl }));
           setSpeechError("");
         }
       } catch (error) {
         if (!cancelled) {
           setSpeechError(error.message || "Failed to load lesson audio");
         }
+      } finally {
+        if (!cancelled) {
+          setAudioLoading((current) => ({ ...current, [targetSlide.id]: false }));
+        }
       }
     }
 
-    ensureAudioForSlide();
+    const narratedSlides = (lesson.slides || []).filter((item) => item?.id && item?.narration);
+    narratedSlides.forEach((targetSlide) => {
+      ensureAudioForSlide(targetSlide);
+    });
+
     return () => {
       cancelled = true;
     };
-  }, [apiBase, audioUrls, lesson.title, slide.id, slide.narration]);
+  }, [apiBase, audioLoading, audioUrls, lesson.slides, lesson.title]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -440,19 +453,34 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
     };
   }, [audioUrls, isLast, muted, slide.id, speaking]);
 
-  useEffect(() => {
-    if (!autoPlayToken) return;
-    setSlideIndex(0);
-    setSpeaking(true);
-  }, [autoPlayToken]);
-
-  function toggleSpeaking() {
+  async function toggleSpeaking() {
     if (speaking) {
       audioRef.current?.pause();
       setSpeaking(false);
     } else {
       setSpeechError("");
-      setSpeaking(true);
+      const currentSrc = audioUrls[slide.id];
+      if (!currentSrc) {
+        setSpeaking(true);
+        return;
+      }
+
+      const audio = audioRef.current;
+      if (!audio) {
+        setSpeaking(true);
+        return;
+      }
+
+      try {
+        audio.src = currentSrc;
+        audio.currentTime = 0;
+        audio.muted = muted;
+        await audio.play();
+        setSpeaking(true);
+      } catch {
+        setSpeechError("Audio playback was blocked. Press play again.");
+        setSpeaking(false);
+      }
     }
   }
 
@@ -516,6 +544,9 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
           </div>
         </div>
 
+        {speaking && !audioUrls[slide.id] && !speechError ? (
+          <div className="manual-note">Preparing narration...</div>
+        ) : null}
         {speechError ? <div className="manual-note warning">{speechError}</div> : null}
         <div className="manual-lesson-narration">{slide.narration}</div>
 
@@ -578,6 +609,7 @@ function LessonPlayer({ lesson, onClose, inline = false, autoPlayToken = 0, apiB
 }
 
 export default function ManualStudentInteractionView({ apiBase, active }) {
+  const workspaceMotionRef = useRef(null);
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [coursesLoaded, setCoursesLoaded] = useState(false);
@@ -596,7 +628,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
   const [summarizing, setSummarizing] = useState({});
   const [summarizingModule, setSummarizingModule] = useState(false);
   const [moduleWorkflowResults, setModuleWorkflowResults] = useState({});
-  const [moduleWorkflowTarget, setModuleWorkflowTarget] = useState("quizzes");
+  const [moduleWorkflowTarget, setModuleWorkflowTarget] = useState("flashcards");
   const [moduleWorkflowLoading, setModuleWorkflowLoading] = useState(false);
   const [moduleWorkflowError, setModuleWorkflowError] = useState("");
   const [quizSelections, setQuizSelections] = useState({});
@@ -607,7 +639,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
   const [lessonJobs, setLessonJobs] = useState({});
   const [lessonModes, setLessonModes] = useState({});
   const [activeLessonFileId, setActiveLessonFileId] = useState(null);
-  const [lessonAutoPlayState, setLessonAutoPlayState] = useState({ fileId: null, nonce: 0 });
   const lessonPanelRefs = useRef({});
 
   const settings = DEFAULT_SETTINGS;
@@ -644,7 +675,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     setSummarizing({});
     setSummarizingModule(false);
     setModuleWorkflowResults({});
-    setModuleWorkflowTarget("quizzes");
+    setModuleWorkflowTarget("flashcards");
     setModuleWorkflowLoading(false);
     setModuleWorkflowError("");
     setQuizSelections({});
@@ -655,7 +686,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     setLessonJobs({});
     setLessonModes({});
     setActiveLessonFileId(null);
-    setLessonAutoPlayState({ fileId: null, nonce: 0 });
   }, []);
 
   const fetchCourses = useCallback(async () => {
@@ -676,6 +706,46 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     if (!active || coursesLoaded || coursesLoading) return;
     fetchCourses();
   }, [active, coursesLoaded, coursesLoading, fetchCourses]);
+
+  useEffect(() => {
+    const root = workspaceMotionRef.current;
+    if (!root || typeof window === "undefined") return undefined;
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const targets = Array.from(
+      root.querySelectorAll(
+        ".manual-card, .manual-course-card, .manual-file-card, .manual-lesson-panel, .manual-module-item"
+      )
+    );
+
+    targets.forEach((node) => node.classList.add("manual-motion-target"));
+
+    if (prefersReducedMotion) {
+      targets.forEach((node) => node.classList.add("is-visible"));
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      {
+        threshold: 0.15,
+        rootMargin: "0px 0px -10% 0px",
+      }
+    );
+
+    targets.forEach((node, index) => {
+      node.style.setProperty("--manual-motion-delay", `${Math.min(index * 55, 360)}ms`);
+      observer.observe(node);
+    });
+
+    return () => observer.disconnect();
+  }, [active, selectedCourse, selectedModule, moduleFiles.length, assignments.length]);
 
   const semesterGroups = useMemo(() => {
     const grouped = courses.reduce((accumulator, course) => {
@@ -781,7 +851,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     setSummaries({});
     setModuleSummary("");
     setModuleWorkflowResults({});
-    setModuleWorkflowTarget("quizzes");
+    setModuleWorkflowTarget("flashcards");
     setModuleWorkflowError("");
     setQuizSelections({});
     setFlashcardFlips({});
@@ -1069,9 +1139,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
     if (!job) return null;
     const fileId = String(file.id);
     const isActiveLesson = activeLessonFileId === fileId && !!job.lesson;
-    const lessonAutoPlayToken =
-      lessonAutoPlayState.fileId === fileId ? lessonAutoPlayState.nonce : 0;
-
     return (
       <div
         className="manual-lesson-panel"
@@ -1099,12 +1166,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
               onClick={() => {
                 if (job.lesson && !job.loading) {
                   setActiveLessonFileId((current) => (current === fileId ? null : fileId));
-                  if (!isActiveLesson) {
-                    setLessonAutoPlayState((current) => ({
-                      fileId,
-                      nonce: current.nonce + 1,
-                    }));
-                  }
                   requestAnimationFrame(() => {
                     lessonPanelRefs.current[fileId]?.scrollIntoView({
                       behavior: "smooth",
@@ -1163,14 +1224,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
             {job.lesson.slides?.[0]?.narration ? (
               <div className="manual-lesson-script">{job.lesson.slides[0].narration}</div>
             ) : null}
-            {isActiveLesson ? (
-              <LessonPlayer
-                lesson={job.lesson}
-                inline
-                autoPlayToken={lessonAutoPlayToken}
-                apiBase={apiBase}
-              />
-            ) : null}
+            {isActiveLesson ? <LessonPlayer lesson={job.lesson} inline apiBase={apiBase} /> : null}
           </>
         ) : null}
       </div>
@@ -1178,14 +1232,14 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
   }
 
   return (
-    <div className="manual-workspace">
+    <div className="manual-workspace" ref={workspaceMotionRef}>
       {!selectedCourse ? (
         <div className="manual-shell">
           <div className="manual-header">
             <div className="manual-header-copy">
               <span className="panel-badge">Manual mode</span>
               <h2>Manual student interaction</h2>
-              <p>Browse your courses by semester, then open a course to work through modules, summaries, and narrated lesson previews.</p>
+              <p>Open courses, inspect modules, and run outputs.</p>
             </div>
 
             <div className="manual-toolbar-actions">
@@ -1328,9 +1382,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                 <>
                   <p className="manual-section-kicker">Manual workflow</p>
                   <h3 className="manual-card-title">Open a module</h3>
-                  <p className="manual-empty">
-                    Select a module to reveal the same working area from the document: file extraction, summaries, assignments, and narrated lesson generation.
-                  </p>
+                  <p className="manual-empty">Select a module to begin.</p>
                 </>
               ) : (
                 <>
@@ -1368,7 +1420,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
 
                   {loadingFiles ? <p className="manual-empty">Loading files...</p> : null}
                   {!loadingFiles && !moduleFiles.length ? (
-                    <p className="manual-empty">No professor-uploaded files in this module.</p>
+                    <p className="manual-empty">No files in this module.</p>
                   ) : null}
 
                   {moduleFiles.length ? (
@@ -1377,7 +1429,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                         <input
                           className="manual-search-input"
                           type="text"
-                          placeholder="Search files or extracted text..."
+                          placeholder="Search files..."
                           value={searchQuery}
                           onChange={(event) => setSearchQuery(event.target.value)}
                         />
@@ -1540,49 +1592,118 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
               <div className="manual-toolbar">
                 <div>
                   <p className="manual-section-kicker">Agent workflow</p>
-                  <h3 className="manual-card-title">Choose what to generate</h3>
+                  <h3 className="manual-card-title">Generate</h3>
                 </div>
               </div>
 
-              <div className="manual-agent-targets">
-                {AGENT_PACK_OPTIONS.map((option) => {
-                  const hasResult = Boolean(moduleWorkflowResults[option.id]);
-                  const isActive = moduleWorkflowTarget === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`manual-agent-target ${isActive ? "active" : ""}`}
-                      onClick={() => setModuleWorkflowTarget(option.id)}
-                    >
-                      <strong>{option.label}</strong>
-                      <span>{hasResult ? "Generated" : "Not generated yet"}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <div className="manual-agent-layout">
+                <div className="manual-agent-targets">
+                  {AGENT_PACK_OPTIONS.map((option) => {
+                    const hasResult = Boolean(moduleWorkflowResults[option.id]);
+                    const isActive = moduleWorkflowTarget === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`manual-agent-target ${isActive ? "active" : ""}`}
+                        onClick={() => setModuleWorkflowTarget(option.id)}
+                      >
+                        <div className="manual-agent-target-top">
+                          <strong>{option.label}</strong>
+                          <span className={`manual-agent-target-state ${hasResult ? "ready" : ""}`}>
+                            {hasResult ? "Ready" : "Pending"}
+                          </span>
+                        </div>
+                        <span>{option.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-              <div className="manual-card-actions" style={{ marginTop: 18 }}>
-                <button
-                  className="manual-btn primary"
-                  onClick={() => handleGenerateModuleWorkflow(moduleWorkflowTarget)}
-                  disabled={moduleWorkflowLoading}
-                >
-                  {moduleWorkflowLoading
-                    ? "Generating..."
-                    : moduleWorkflowResults[moduleWorkflowTarget]
-                      ? `Regenerate ${AGENT_PACK_OPTIONS.find((option) => option.id === moduleWorkflowTarget)?.label || "output"}`
-                      : `Generate ${AGENT_PACK_OPTIONS.find((option) => option.id === moduleWorkflowTarget)?.label || "output"}`}
-                </button>
+                <div className="manual-agent-control-panel">
+                  <div className="manual-agent-control-orbit" aria-hidden="true">
+                    <svg viewBox="0 0 240 140" className="manual-agent-control-svg">
+                      <defs>
+                        <linearGradient id="manualOrbitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#8b1e3f" stopOpacity="0.95" />
+                          <stop offset="55%" stopColor="#ffb703" stopOpacity="0.85" />
+                          <stop offset="100%" stopColor="#1d4ed8" stopOpacity="0.82" />
+                        </linearGradient>
+                      </defs>
+                      <ellipse
+                        className="manual-agent-orbit-ring"
+                        cx="120"
+                        cy="70"
+                        rx="94"
+                        ry="34"
+                        fill="none"
+                        stroke="url(#manualOrbitGradient)"
+                        strokeWidth="4"
+                      />
+                      <ellipse
+                        className="manual-agent-orbit-ring manual-agent-orbit-ring-alt"
+                        cx="120"
+                        cy="70"
+                        rx="62"
+                        ry="22"
+                        fill="none"
+                        stroke="url(#manualOrbitGradient)"
+                        strokeWidth="3"
+                      />
+                      <circle className="manual-agent-orbit-node manual-agent-orbit-node-a" cx="40" cy="72" r="8" fill="#8b1e3f" />
+                      <circle className="manual-agent-orbit-node manual-agent-orbit-node-b" cx="120" cy="46" r="10" fill="#ffb703" />
+                      <circle className="manual-agent-orbit-node manual-agent-orbit-node-c" cx="198" cy="76" r="7" fill="#1d4ed8" />
+                    </svg>
+                  </div>
+                  <span className="manual-agent-control-kicker">Selected output</span>
+                  <h4>
+                    {AGENT_PACK_OPTIONS.find((option) => option.id === moduleWorkflowTarget)?.label || "Output"}
+                  </h4>
+                  <p>{AGENT_PACK_OPTIONS.find((option) => option.id === moduleWorkflowTarget)?.description || "Run the selected output."}</p>
+
+                  <div className="manual-card-actions manual-agent-control-actions">
+                    <button
+                      className="manual-btn primary"
+                      onClick={() => handleGenerateModuleWorkflow(moduleWorkflowTarget)}
+                      disabled={moduleWorkflowLoading}
+                    >
+                      {moduleWorkflowLoading
+                        ? "Generating..."
+                        : moduleWorkflowResults[moduleWorkflowTarget]
+                          ? `Regenerate ${AGENT_PACK_OPTIONS.find((option) => option.id === moduleWorkflowTarget)?.label || "output"}`
+                          : `Generate ${AGENT_PACK_OPTIONS.find((option) => option.id === moduleWorkflowTarget)?.label || "output"}`}
+                    </button>
+                    {moduleWorkflowResults[moduleWorkflowTarget] ? (
+                      <button
+                        className="manual-btn"
+                        onClick={() =>
+                          setModuleWorkflowResults((current) => ({
+                            ...current,
+                            [moduleWorkflowTarget]: null,
+                          }))
+                        }
+                        disabled={moduleWorkflowLoading}
+                      >
+                        Clear result
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="manual-agent-control-meta">
+                    <span>
+                      Module: <strong>{selectedModule.name}</strong>
+                    </span>
+                    <span>
+                      PDFs: <strong>{pdfCount}</strong>
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {moduleWorkflowTarget === "study_plan" ? (
                 <div className="manual-study-preferences">
                   <div className="manual-study-preferences-header">
-                    <h4>Study plan preferences</h4>
-                    <p className="manual-muted">
-                      Set your time and planning preferences before generating the plan.
-                    </p>
+                    <h4>Study plan settings</h4>
                   </div>
 
                   <div className="manual-study-preferences-grid">
@@ -1705,13 +1826,11 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
               {moduleWorkflowError ? <div className="manual-note error">{moduleWorkflowError}</div> : null}
 
               {!moduleWorkflowLoading && !selectedWorkflow ? (
-                <p className="manual-empty">
-                  Pick one output above, then generate only that item for this module.
-                </p>
+                <p className="manual-empty">Select an output to generate.</p>
               ) : null}
 
               {moduleWorkflowLoading ? (
-                <p className="manual-empty">Agents are building your selected output...</p>
+                <p className="manual-empty">Generating...</p>
               ) : null}
 
               {selectedWorkflow ? (
@@ -1742,9 +1861,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                       <div className="manual-output-head">
                         <div>
                           <h4>Study Planner</h4>
-                          <p className="manual-muted">
-                            A paced schedule generated from your selected module materials.
-                          </p>
                         </div>
                       </div>
                       {selectedStudySessions.length ? (
@@ -1790,9 +1906,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                               <div className="feature-library-head">
                                 <div>
                                   <h3>Daily Study Schedule</h3>
-                                  <p className="feature-subcopy">
-                                    Built from your module materials, available hours, and selected study days.
-                                  </p>
                                 </div>
                                 <div className="feature-output-meta">
                                   <span>{formatStudyPace(studyPlanPreferences.pace)}</span>
@@ -1844,7 +1957,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                           </section>
                         </>
                       ) : (
-                        <p className="manual-empty">No study planner output yet.</p>
+                        <p className="manual-empty">No study plan yet.</p>
                       )}
                     </div>
                   ) : null}
@@ -1854,9 +1967,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                       <div className="manual-output-head">
                         <div>
                           <h4>Quiz</h4>
-                          <p className="manual-muted">
-                            Practice questions generated from the selected module PDFs.
-                          </p>
                         </div>
                         <div className="manual-card-actions">
                           <button type="button" className="manual-btn" onClick={resetQuizSelections}>
@@ -1935,7 +2045,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                           })}
                         </div>
                       ) : (
-                        <p className="manual-empty">No quiz output yet.</p>
+                        <p className="manual-empty">No quiz yet.</p>
                       )}
                     </div>
                   ) : null}
@@ -1945,9 +2055,6 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                       <div className="manual-output-head">
                         <div>
                           <h4>Flashcards</h4>
-                          <p className="manual-muted">
-                            Flip through the key prompts and answers pulled from the module materials.
-                          </p>
                         </div>
                         <div className="manual-card-actions">
                           <button type="button" className="manual-btn" onClick={() => setAllFlashcards(selectedFlashcards, true)}>
@@ -1990,7 +2097,7 @@ export default function ManualStudentInteractionView({ apiBase, active }) {
                         </div>
                         </>
                       ) : (
-                        <p className="manual-empty">No flashcards generated yet.</p>
+                        <p className="manual-empty">No flashcards yet.</p>
                       )}
                     </div>
                   ) : null}

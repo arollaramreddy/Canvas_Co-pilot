@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import {
   ChangeCard,
@@ -22,6 +22,25 @@ const TABS = [
   { id: quizConfig.id, label: quizConfig.label },
   { id: "manual", label: "Manual student interaction" },
 ];
+
+const TAB_META = {
+  autonomous: {
+    eyebrow: "Live orchestration",
+    description: "Inbox, materials, and grades in one view.",
+  },
+  [studyPlanConfig.id]: {
+    eyebrow: "Planner",
+    description: "Build and refine study plans.",
+  },
+  [quizConfig.id]: {
+    eyebrow: "Assessment",
+    description: "Generate and review quizzes.",
+  },
+  manual: {
+    eyebrow: "Manual mode",
+    description: "Open modules and run outputs.",
+  },
+};
 
 const AUTONOMOUS_ROUTES = [
   { id: "overview", label: "Overview", path: "/" },
@@ -172,13 +191,13 @@ function RouteSidebar({ activeRoute, onNavigate }) {
 
       <div className="sidebar-block">
         <span className="panel-badge">What it does</span>
-        <p>Messages, new materials, grades, quizzes, flashcards, videos, and study planning all live here.</p>
+        <p>Messages, materials, scores, and practice.</p>
       </div>
     </aside>
   );
 }
 
-function OverviewPage({ feed, materialCards, runtimeState, onNavigate }) {
+function OverviewPage({ feed, materialCards, runtimeState }) {
   const messages = feed.filter((item) => item.type === "message");
   const gradedAssignments = runtimeState?.canvas?.courseState?.assignments?.filter(
     (assignment) => assignment.score !== null && assignment.score !== undefined
@@ -190,11 +209,8 @@ function OverviewPage({ feed, materialCards, runtimeState, onNavigate }) {
       <section className="route-hero">
         <div>
           <span className="panel-badge">Autonomous agents working</span>
-          <h2>Agentic AI workflow for student support</h2>
-          <p>
-            Your agents communicate with each other to handle inbox messages, new professor materials,
-            released scores, quizzes, flashcards, video generation, and study planning.
-          </p>
+          <h2>Student support workspace</h2>
+          <p>Agents handle inbox, materials, scores, practice, and planning.</p>
         </div>
 
         <div className="hero-metric-grid">
@@ -214,64 +230,6 @@ function OverviewPage({ feed, materialCards, runtimeState, onNavigate }) {
             <strong>{lowScoreCount}</strong>
             <span>Needs improvement</span>
           </div>
-        </div>
-      </section>
-
-      <section className="route-section">
-        <div className="section-header-inline">
-          <div>
-            <span className="panel-badge">Flow</span>
-            <h3>How the autonomous tab helps</h3>
-          </div>
-        </div>
-
-        <div className="trigger-grid">
-          <article className="trigger-card">
-            <strong>Inbox messages</strong>
-            <span>When a message arrives, you can open it here, draft a reply, and send it.</span>
-          </article>
-          <article className="trigger-card">
-            <strong>Materials</strong>
-            <span>When a professor posts PDFs or materials, agents parse, fetch, summarize, and prepare video help.</span>
-          </article>
-          <article className="trigger-card">
-            <strong>Scores</strong>
-            <span>When marks are released, agents explain mistakes, suggest improvements, and trigger support.</span>
-          </article>
-          <article className="trigger-card">
-            <strong>Quizzes and flashcards</strong>
-            <span>Practice content is generated from the selected material workflow.</span>
-          </article>
-          <article className="trigger-card">
-            <strong>Study planner</strong>
-            <span>The planner agent turns deadlines and weak topics into focused study sessions.</span>
-          </article>
-          <article className="trigger-card">
-            <strong>Manual tab</strong>
-            <span>Students can still manually open courses, materials, discussions, videos, quizzes, and summaries.</span>
-          </article>
-        </div>
-      </section>
-
-      <section className="route-section">
-        <div className="section-header-inline">
-          <div>
-            <span className="panel-badge">Quick open</span>
-            <h3>Go to the right section</h3>
-          </div>
-        </div>
-
-        <div className="trigger-grid">
-          {AUTONOMOUS_ROUTES.filter((route) => route.id !== "overview" && route.id !== "settings").map((route) => (
-            <article key={route.id} className="trigger-card">
-              <strong>{route.label}</strong>
-              <span>
-                <button type="button" className="secondary-button" onClick={() => onNavigate(route.id)}>
-                  Open
-                </button>
-              </span>
-            </article>
-          ))}
         </div>
       </section>
     </div>
@@ -304,7 +262,7 @@ function InboxPage({
         <div className="section-header-inline">
           <div>
             <span className="panel-badge">Inbox</span>
-            <h3>Reply-ready message workflow</h3>
+            <h3>Reply-ready messages</h3>
           </div>
         </div>
 
@@ -322,7 +280,7 @@ function InboxPage({
           ) : (
             <div className="empty-card">
               <h3>No inbox actions</h3>
-              <p>When someone sends a message, it will appear here with draft and send actions.</p>
+              <p>New messages show up here.</p>
             </div>
           )}
         </div>
@@ -343,7 +301,7 @@ function InboxPage({
               </div>
             ))
           ) : (
-            <p>No draft yet. Click `Draft` on a message and the agents will prepare a reply.</p>
+            <p>No draft yet.</p>
           )}
         </div>
       </aside>
@@ -364,7 +322,7 @@ function MaterialsPage({
         <div className="section-header-inline">
           <div>
             <span className="panel-badge">Materials</span>
-            <h3>Professor-posted PDFs and course materials</h3>
+            <h3>Posted materials</h3>
           </div>
         </div>
 
@@ -381,7 +339,7 @@ function MaterialsPage({
           ) : (
             <div className="empty-card">
               <h3>No material events</h3>
-              <p>When a professor adds a PDF or new material, it will show up here.</p>
+              <p>New files show up here.</p>
             </div>
           )}
         </div>
@@ -410,7 +368,7 @@ function ScoresPage({ runtimeState }) {
         <div className="section-header-inline">
           <div>
             <span className="panel-badge">Scores</span>
-            <h3>Graded assignments and improvement support</h3>
+            <h3>Graded work</h3>
           </div>
         </div>
 
@@ -446,7 +404,7 @@ function ScoresPage({ runtimeState }) {
           ) : (
             <div className="empty-card">
               <h3>No graded work yet</h3>
-              <p>When a score is released, agents will surface improvement guidance here.</p>
+              <p>Released scores appear here.</p>
             </div>
           )}
         </div>
@@ -471,14 +429,14 @@ function PracticePage({
         <div className="section-header-inline">
           <div>
             <span className="panel-badge">Practice</span>
-            <h3>Quizzes and flashcards from material workflows</h3>
+            <h3>Practice sets</h3>
           </div>
         </div>
 
         {materialLoading ? (
           <div className="empty-card">
-            <h3>Agents are building practice material</h3>
-            <p>The selected material is being turned into quizzes, flashcards, summary support, and video help.</p>
+            <h3>Building practice</h3>
+            <p>Generating quizzes and flashcards.</p>
           </div>
         ) : (
           <div className="route-page">
@@ -506,7 +464,7 @@ function PracticePage({
                 ) : (
                   <div className="empty-card">
                     <h3>No quiz yet</h3>
-                    <p>Select a material in the right panel and the agents will generate quiz questions.</p>
+                    <p>Select material to generate a quiz.</p>
                   </div>
                 )}
               </div>
@@ -536,7 +494,7 @@ function PracticePage({
                 ) : (
                   <div className="empty-card">
                     <h3>No flashcards yet</h3>
-                    <p>Select a material in the right panel and the agents will generate flashcards.</p>
+                    <p>Select material to generate flashcards.</p>
                   </div>
                 )}
               </div>
@@ -567,7 +525,7 @@ function PracticePage({
             ) : (
               <div className="empty-card">
                 <h3>No material events</h3>
-                <p>Once the professor posts content, you can generate practice here.</p>
+                <p>Posted files show up here.</p>
               </div>
             )}
           </div>
@@ -591,7 +549,7 @@ function StudyPlannerPage({ runtimeState, materialWorkflow }) {
         <div className="section-header-inline">
           <div>
             <span className="panel-badge">Study planner</span>
-            <h3>Agent-generated study sessions</h3>
+            <h3>Study sessions</h3>
           </div>
         </div>
 
@@ -611,8 +569,8 @@ function StudyPlannerPage({ runtimeState, materialWorkflow }) {
             ))
           ) : (
             <div className="empty-card">
-              <h3>No generated study plan yet</h3>
-              <p>Open a material in the Materials section and the study planner agent will populate this area.</p>
+              <h3>No study plan yet</h3>
+              <p>Open material to generate one.</p>
             </div>
           )}
         </div>
@@ -622,7 +580,7 @@ function StudyPlannerPage({ runtimeState, materialWorkflow }) {
         <div className="section-header-inline">
           <div>
             <span className="panel-badge">Upcoming work</span>
-            <h3>Assignments and deadlines</h3>
+            <h3>Deadlines</h3>
           </div>
         </div>
 
@@ -637,7 +595,7 @@ function StudyPlannerPage({ runtimeState, materialWorkflow }) {
           ) : (
             <div className="empty-card">
               <h3>No upcoming assignments</h3>
-              <p>The study planner will prioritize future work here when deadlines are available.</p>
+              <p>Upcoming work appears here.</p>
             </div>
           )}
         </div>
@@ -692,7 +650,7 @@ function AutonomousWorkspace({
         {autonomousLoading ? (
           <div className="empty-card">
             <h3>Loading autonomous workspace</h3>
-            <p>Pulling messages, materials, scores, quizzes, flashcards, and study planning signals.</p>
+            <p>Loading updates.</p>
           </div>
         ) : null}
 
@@ -701,7 +659,6 @@ function AutonomousWorkspace({
             feed={feed}
             materialCards={materialCards}
             runtimeState={runtimeState}
-            onNavigate={onNavigate}
           />
         ) : null}
 
@@ -760,12 +717,20 @@ function AutonomousWorkspace({
 }
 
 function App() {
+  const workspaceFrameRef = useRef(null);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    return window.localStorage.getItem("canvas-copilot-theme") || "dark";
+  });
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [error, setError] = useState("");
   const [tokenInput, setTokenInput] = useState("");
+  const [panelMotionKey, setPanelMotionKey] = useState(0);
+  const [navVisible, setNavVisible] = useState(true);
+  const [navScrolled, setNavScrolled] = useState(false);
   const initialRoute = parsePathRoute();
   const [activeTab, setActiveTab] = useState(initialRoute.tab);
   const [autonomousRoute, setAutonomousRoute] = useState(initialRoute.autonomousRoute);
@@ -824,6 +789,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("canvas-copilot-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
     const handlePopState = () => {
       const next = parsePathRoute();
       setPathname(next.pathname);
@@ -834,6 +805,97 @@ function App() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  useEffect(() => {
+    setPanelMotionKey((current) => current + 1);
+  }, [activeTab, autonomousRoute, pathname]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    let previousY = window.scrollY;
+
+    const handleScroll = () => {
+      const currentY = window.scrollY;
+      setNavScrolled(currentY > 18);
+      if (currentY < 24) {
+        setNavVisible(true);
+      } else if (currentY > previousY + 6) {
+        setNavVisible(false);
+      } else if (currentY < previousY - 6) {
+        setNavVisible(true);
+      }
+      previousY = currentY;
+      document.documentElement.style.setProperty("--scroll-y", `${currentY.toFixed(1)}`);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const root = workspaceFrameRef.current;
+    if (!root || typeof window === "undefined") return undefined;
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const motionTargets = Array.from(root.querySelectorAll("[data-motion]"));
+
+    if (prefersReducedMotion) {
+      motionTargets.forEach((node) => node.classList.add("is-visible"));
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      },
+      {
+        threshold: 0.18,
+        rootMargin: "0px 0px -8% 0px",
+      }
+    );
+
+    motionTargets.forEach((node, index) => {
+      node.style.setProperty("--motion-delay", `${Math.min(index * 70, 420)}ms`);
+      observer.observe(node);
+    });
+
+    return () => observer.disconnect();
+  }, [user, authLoading, activeTab, autonomousRoute, panelMotionKey]);
+
+  useEffect(() => {
+    const root = workspaceFrameRef.current;
+    if (!root || typeof window === "undefined") return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+
+    const header = root.querySelector(".workspace-header");
+    if (!header) return undefined;
+
+    const handlePointerMove = (event) => {
+      const bounds = header.getBoundingClientRect();
+      const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+      const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+      root.style.setProperty("--pointer-x", `${x.toFixed(3)}`);
+      root.style.setProperty("--pointer-y", `${y.toFixed(3)}`);
+    };
+
+    const resetPointer = () => {
+      root.style.setProperty("--pointer-x", "0");
+      root.style.setProperty("--pointer-y", "0");
+    };
+
+    header.addEventListener("pointermove", handlePointerMove);
+    header.addEventListener("pointerleave", resetPointer);
+
+    return () => {
+      header.removeEventListener("pointermove", handlePointerMove);
+      header.removeEventListener("pointerleave", resetPointer);
+    };
+  }, [user]);
 
   const bootstrapSession = useCallback(async () => {
     setAuthLoading(true);
@@ -904,6 +966,10 @@ function App() {
     } finally {
       setLoggingOut(false);
     }
+  }
+
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
   function handleTabSelect(tabId) {
@@ -978,88 +1044,136 @@ function App() {
 
   return (
     <div className="app-shell app-shell-workspace">
-      <div className="workspace-frame workspace-frame-wide">
-        <header className="workspace-header">
-          <div>
+      <div className="workspace-frame workspace-frame-wide" ref={workspaceFrameRef}>
+        <header
+          className={`workspace-header ${navScrolled ? "is-scrolled" : ""} ${navVisible ? "is-visible" : "is-hidden"}`}
+          data-motion="hero"
+        >
+          <div className="workspace-header-copy" data-motion="copy">
             <span className="brand-tag">Canvas Copilot</span>
             <h1>Welcome, {user.name}</h1>
           </div>
-          <button className="secondary-button" onClick={handleLogout} disabled={loggingOut}>
-            {loggingOut ? "Logging out..." : "Logout"}
-          </button>
+          <div className="workspace-header-visual" aria-hidden="true" data-motion="visual">
+            <svg viewBox="0 0 320 120" className="workspace-header-svg">
+              <defs>
+                <linearGradient id="workspacePulse" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#8b1e3f" stopOpacity="0.95" />
+                  <stop offset="50%" stopColor="#ffb703" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#2563eb" stopOpacity="0.9" />
+                </linearGradient>
+              </defs>
+              <path
+                className="workspace-header-svg-path"
+                d="M12 88 C68 18, 120 18, 164 62 S252 110, 308 38"
+                fill="none"
+                stroke="url(#workspacePulse)"
+                strokeWidth="8"
+                strokeLinecap="round"
+              />
+              <circle className="workspace-header-svg-node workspace-header-svg-node-a" cx="62" cy="42" r="10" fill="#8b1e3f" />
+              <circle className="workspace-header-svg-node workspace-header-svg-node-b" cx="166" cy="62" r="12" fill="#ffb703" />
+              <circle className="workspace-header-svg-node workspace-header-svg-node-c" cx="268" cy="58" r="9" fill="#2563eb" />
+            </svg>
+          </div>
+          <div className="workspace-header-actions">
+            <button className="secondary-button theme-toggle-button" onClick={toggleTheme} type="button">
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
+            <button className="secondary-button" onClick={handleLogout} disabled={loggingOut}>
+              {loggingOut ? "Logging out..." : "Logout"}
+            </button>
+          </div>
         </header>
 
-        <section className="workspace-card workspace-card-wide">
-          <div className="tab-row" role="tablist" aria-label="Workspace tabs">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                className={`tab-button ${activeTab === tab.id ? "active" : ""}`}
-                onClick={() => handleTabSelect(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <section className="workspace-card workspace-card-wide" data-motion="card">
+          <div className="workspace-switcher" data-motion="switcher">
+            <div className="workspace-switcher-copy">
+              <span className="panel-badge">Workspace switcher</span>
+              <h2>{TABS.find((tab) => tab.id === activeTab)?.label || "Workspace"}</h2>
+              <p>{TAB_META[activeTab]?.description || "Choose the workflow you want to work in."}</p>
+            </div>
+
+            <div className="tab-row tab-row-advanced" role="tablist" aria-label="Workspace tabs">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  className={`tab-button tab-button-advanced ${activeTab === tab.id ? "active" : ""}`}
+                  onClick={() => handleTabSelect(tab.id)}
+                >
+                  <span className="tab-button-eyebrow">{TAB_META[tab.id]?.eyebrow || "Workspace"}</span>
+                  <strong>{tab.label}</strong>
+                  <span className="tab-button-description">
+                    {TAB_META[tab.id]?.description || "Open workspace"}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="tab-panel tab-panel-wide" role="tabpanel">
-            {activeTab === "autonomous" ? (
-              <AutonomousWorkspace
-                autonomousError={autonomousError}
-                autonomousLoading={autonomousLoading}
-                autonomousRoute={autonomousRoute}
-                clarificationInputs={clarificationInputs}
-                drafts={drafts}
-                feed={feed}
-                materialCards={materialCards}
-                materialLoading={materialLoading}
-                materialWorkflow={materialWorkflow}
-                draftingMessageId={draftingMessageId}
-                onNavigate={handleAutonomousRoute}
-                onClarificationChange={onClarificationChange}
-                onOpenMaterial={onOpenMaterial}
-                onDraftReply={onDraftReply}
-                onPreferenceChange={onPreferenceChange}
-                onSendReply={onSendReply}
-                preferences={preferences}
-                runtimeState={runtimeState}
-                selectedMaterial={selectedMaterial}
-                sendingMessageId={sendingMessageId}
-                syncNow={syncNow}
-                syncing={syncing}
-              />
-            ) : (
-              <div className="panel-copy">
-                {activeTab === studyPlanConfig.id ? (
-                  <StudyPlanWorkspace
-                    apiBase={API}
-                    apiFetchJson={apiFetchJson}
-                    user={user}
-                    courses={courses}
-                    routePath={pathname}
-                    onNavigateList={() => navigateToPath("/study-plan")}
-                    onNavigateDraft={() => navigateToPath("/study-plan/draft")}
-                    onNavigateSavedPlan={(planId) => navigateToPath(`/study-plan/${encodeURIComponent(planId)}`)}
-                  />
-                ) : activeTab === quizConfig.id ? (
-                  <QuizWorkspace
-                    apiBase={API}
-                    apiFetchJson={apiFetchJson}
-                    user={user}
-                    courses={courses}
-                    routePath={pathname}
-                    onNavigateList={() => navigateToPath("/quiz")}
-                    onNavigateDraft={() => navigateToPath("/quiz/draft")}
-                    onNavigateSavedQuiz={(quizId) => navigateToPath(`/quiz/${encodeURIComponent(quizId)}`)}
-                  />
-                ) : (
-                  <ManualStudentInteractionView apiBase={API} active={activeTab === "manual"} />
-                )}
-              </div>
-            )}
+            <div
+              className="workspace-motion-stage"
+              key={`${activeTab}-${autonomousRoute}-${panelMotionKey}`}
+              data-motion="panel"
+            >
+              {activeTab === "autonomous" ? (
+                <AutonomousWorkspace
+                  autonomousError={autonomousError}
+                  autonomousLoading={autonomousLoading}
+                  autonomousRoute={autonomousRoute}
+                  clarificationInputs={clarificationInputs}
+                  drafts={drafts}
+                  feed={feed}
+                  materialCards={materialCards}
+                  materialLoading={materialLoading}
+                  materialWorkflow={materialWorkflow}
+                  draftingMessageId={draftingMessageId}
+                  onNavigate={handleAutonomousRoute}
+                  onClarificationChange={onClarificationChange}
+                  onOpenMaterial={onOpenMaterial}
+                  onDraftReply={onDraftReply}
+                  onPreferenceChange={onPreferenceChange}
+                  onSendReply={onSendReply}
+                  preferences={preferences}
+                  runtimeState={runtimeState}
+                  selectedMaterial={selectedMaterial}
+                  sendingMessageId={sendingMessageId}
+                  syncNow={syncNow}
+                  syncing={syncing}
+                />
+              ) : (
+                <div className="panel-copy">
+                  {activeTab === studyPlanConfig.id ? (
+                    <StudyPlanWorkspace
+                      apiBase={API}
+                      apiFetchJson={apiFetchJson}
+                      user={user}
+                      courses={courses}
+                      routePath={pathname}
+                      onNavigateList={() => navigateToPath("/study-plan")}
+                      onNavigateDraft={() => navigateToPath("/study-plan/draft")}
+                      onNavigateSavedPlan={(planId) => navigateToPath(`/study-plan/${encodeURIComponent(planId)}`)}
+                    />
+                  ) : activeTab === quizConfig.id ? (
+                    <QuizWorkspace
+                      apiBase={API}
+                      apiFetchJson={apiFetchJson}
+                      user={user}
+                      courses={courses}
+                      routePath={pathname}
+                      onNavigateList={() => navigateToPath("/quiz")}
+                      onNavigateDraft={() => navigateToPath("/quiz/draft")}
+                      onNavigateSavedQuiz={(quizId) => navigateToPath(`/quiz/${encodeURIComponent(quizId)}`)}
+                    />
+                  ) : (
+                    <ManualStudentInteractionView apiBase={API} active={activeTab === "manual"} />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </div>

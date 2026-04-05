@@ -33,7 +33,7 @@ const {
   deriveMessageCourseContext,
   getCourseFacts,
 } = require("./lib/curated-autonomous-message-agent");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
@@ -481,9 +481,42 @@ async function downloadCanvasFile(fileUrl, accessToken) {
 const textCache = new Map();
 const workspaceSnapshotCache = new Map();
 const workflowRunStore = new Map();
+const apiResponseCache = new Map();
 
 function makeWorkspaceCacheKey(courseId, accessToken) {
   return `${courseId}:${String(accessToken || "").slice(-12)}`;
+}
+
+async function withApiCache(key, ttlMs, loader) {
+  const cached = apiResponseCache.get(key);
+  const now = Date.now();
+
+  if (cached) {
+    if (cached.value && now - cached.createdAt < ttlMs) {
+      return cached.value;
+    }
+
+    if (cached.promise) {
+      return cached.promise;
+    }
+  }
+
+  const promise = Promise.resolve()
+    .then(loader)
+    .then((value) => {
+      apiResponseCache.set(key, {
+        value,
+        createdAt: Date.now(),
+      });
+      return value;
+    })
+    .catch((error) => {
+      apiResponseCache.delete(key);
+      throw error;
+    });
+
+  apiResponseCache.set(key, { promise, createdAt: now });
+  return promise;
 }
 
 function safeJsonParseObject(text) {
@@ -1561,6 +1594,11 @@ Rules:
 - correct_answer must be only one letter: A, B, C, or D.
 - Do not reveal the correct answer inside the option text itself.
 - flashcards: 4 to 8 items.
+- Flashcards must be grounded in the selected professor-posted file/module text first.
+- Use relevant course state or external context only to clarify the same concept, never to replace the source material.
+- Every flashcard front should name a real concept, term, process, formula, example, or distinction that appears in the file/module text.
+- Every flashcard back should explain that exact concept in student-friendly language using the file text and, when useful, one relevant clarifying detail.
+- Do not generate generic study-skills cards or vague cards like "important idea", "main concept", or "chapter overview".
 - curated_resources should recommend targeted learning support based on student state.
 - stages must reflect a real workflow.
 - agent_team must include 3 to 4 specialized agents with distinct roles.
@@ -2164,10 +2202,16 @@ app.get("/api/test-login", async (req, res) => {
 app.get("/api/courses", async (req, res) => {
   try {
     const accessToken = getCanvasAccessToken(req);
-    const courses = await canvasRequestAll(
-      "/courses?per_page=50&enrollment_state=active",
-      10,
-      accessToken
+    const context = getSessionContext(req);
+    const courses = await withApiCache(
+      `courses:${context.sessionId || "anon"}`,
+      60 * 1000,
+      async () =>
+        canvasRequestAll(
+          "/courses?per_page=50&enrollment_state=active",
+          10,
+          accessToken
+        )
     );
     res.json(
       courses.map((c) => ({
@@ -2188,26 +2232,8 @@ app.get("/api/courses", async (req, res) => {
 app.get("/api/courses/:courseId/assignments", async (req, res) => {
   try {
     const accessToken = getCanvasAccessToken(req);
-    const assignments = await canvasRequestAll(
-      `/courses/${req.params.courseId}/assignments?per_page=50&order_by=due_at&include[]=submission`,
-      10,
-      accessToken
-    );
-    res.json(
-      assignments.map((a) => ({
-        id: a.id,
-        name: a.name,
-        due_at: a.due_at,
-        points_possible: a.points_possible,
-        html_url: a.html_url,
-        score: a.submission?.score ?? null,
-        grade: a.submission?.grade ?? null,
-        submitted_at: a.submission?.submitted_at || null,
-        missing: Boolean(a.submission?.missing),
-        submission_status: a.submission?.workflow_state || null,
-        is_completed: isAssignmentCompleted(a),
-      }))
-    );
+    const state = await buildWorkspaceState(req.params.courseId, accessToken);
+    res.json(state.assignments || []);
   } catch (err) {
     res
       .status(err.status || 500)
@@ -2219,9 +2245,11 @@ app.get("/api/courses/:courseId/assignments", async (req, res) => {
 app.get("/api/courses/:courseId/files", async (req, res) => {
   try {
     const accessToken = getCanvasAccessToken(req);
-    const files = await canvasRequest(
-      `/courses/${req.params.courseId}/files?per_page=20`,
-      accessToken
+    const context = getSessionContext(req);
+    const files = await withApiCache(
+      `course-files:${context.sessionId || "anon"}:${req.params.courseId}`,
+      60 * 1000,
+      async () => canvasRequest(`/courses/${req.params.courseId}/files?per_page=20`, accessToken)
     );
     res.json(
       files.map((f) => ({
@@ -2248,13 +2276,9 @@ app.get("/api/modules", async (req, res) => {
 
   try {
     const accessToken = getCanvasAccessToken(req);
-    const modules = await canvasRequestAll(
-      `/courses/${courseId}/modules?per_page=50&include[]=items_count`,
-      10,
-      accessToken
-    );
+    const state = await buildWorkspaceState(courseId, accessToken);
     res.json(
-      modules.map((m) => ({
+      (state.modules || []).map((m) => ({
         id: m.id,
         name: m.name,
         position: m.position,
@@ -2278,65 +2302,11 @@ app.get("/api/module-files", async (req, res) => {
 
   try {
     const accessToken = getCanvasAccessToken(req);
-    const items = await canvasRequestAll(
-      `/courses/${courseId}/modules/${moduleId}/items?per_page=100`,
-      10,
-      accessToken
-    );
-
-    // Filter to only File and ExternalUrl types (professor uploads)
-    // Ignore: Assignment, Discussion, Quiz, SubHeader, Page (student-facing)
-    const fileItems = items.filter(
+    const state = await buildWorkspaceState(courseId, accessToken);
+    const module = (state.modules || []).find((entry) => String(entry.id) === String(moduleId));
+    const enriched = (module?.items || []).filter(
       (item) => item.type === "File" || item.type === "ExternalUrl"
     );
-
-    // For File items, fetch file metadata to get URL and content type
-    const enriched = await Promise.all(
-      fileItems.map(async (item) => {
-        if (item.type === "File" && item.content_id) {
-          try {
-            const file = await canvasRequest(
-              `/courses/${courseId}/files/${item.content_id}`,
-              accessToken
-            );
-            return {
-              id: file.id,
-              module_item_id: item.id,
-              display_name: file.display_name,
-              filename: file.filename,
-              size: file.size,
-              content_type: file.content_type || "",
-              url: file.url,
-              created_at: file.created_at,
-              type: "File",
-              is_pdf:
-                (file.content_type || "").includes("pdf") ||
-                (file.filename || "").toLowerCase().endsWith(".pdf"),
-            };
-          } catch {
-            return {
-              id: item.content_id,
-              module_item_id: item.id,
-              display_name: item.title,
-              type: "File",
-              is_pdf: (item.title || "").toLowerCase().endsWith(".pdf"),
-              error: "Could not fetch file details",
-            };
-          }
-        }
-
-        // External URL
-        return {
-          id: item.id,
-          module_item_id: item.id,
-          display_name: item.title,
-          external_url: item.external_url,
-          type: "ExternalUrl",
-          is_pdf: false,
-        };
-      })
-    );
-
     res.json(enriched);
   } catch (err) {
     res
@@ -2479,26 +2449,31 @@ app.get("/api/langgraph/runtime-state", async (req, res) => {
     const { courseId, moduleId, topicId, workflowType = "course_brief" } = req.query;
 
     const accessToken = getCanvasAccessToken(req);
-    const runtimeState = await buildLangGraphRuntimeState({
-      db,
-      request: {
-        courseId,
-        moduleId: moduleId || null,
-        topicId: topicId || null,
-        workflowType,
-        preferences: {},
-      },
-      accessToken,
-      sessionId: context.sessionId,
-      userId: context.userId,
-      currentUser: context.session?.user || null,
-      listActiveCanvasCourses,
-      buildWorkspaceState,
-      buildInboxState,
-      ensureTopicText,
-      ensureModuleText,
-      computeInterventionScore,
-    });
+    const runtimeState = await withApiCache(
+      `runtime:${context.sessionId || "anon"}:${courseId || ""}:${moduleId || ""}:${topicId || ""}:${workflowType}`,
+      15 * 1000,
+      async () =>
+        buildLangGraphRuntimeState({
+          db,
+          request: {
+            courseId,
+            moduleId: moduleId || null,
+            topicId: topicId || null,
+            workflowType,
+            preferences: {},
+          },
+          accessToken,
+          sessionId: context.sessionId,
+          userId: context.userId,
+          currentUser: context.session?.user || null,
+          listActiveCanvasCourses,
+          buildWorkspaceState,
+          buildInboxState,
+          ensureTopicText,
+          ensureModuleText,
+          computeInterventionScore,
+        })
+    );
 
     res.json(runtimeState);
   } catch (err) {
@@ -2548,8 +2523,12 @@ app.get("/api/messages", async (req, res) => {
   try {
     const accessToken = getCanvasAccessToken(req);
     const context = getSessionContext(req);
-    const inbox = await buildInboxState(accessToken, context.session?.user || null);
     const limit = Number(req.query.limit || 10);
+    const inbox = await withApiCache(
+      `messages:${context.sessionId || "anon"}:${limit}`,
+      15 * 1000,
+      async () => buildInboxState(accessToken, context.session?.user || null)
+    );
     res.json((inbox.messages || []).slice(0, limit));
   } catch (err) {
     res.status(err.status || 500).json({ error: `Failed to load messages: ${err.message}` });
@@ -3723,6 +3702,10 @@ app.post("/api/generate-lesson", async (req, res) => {
       model: OPENAI_MODEL_LESSON,
       input: `You are an expert educator creating a narrated video lesson from course material.
 
+The lesson must feel like an interactive teacher-led walkthrough, not a static slide deck.
+Teach by using concrete examples, mini what-if scenarios, intuitive analogies, and short check-for-understanding moments.
+When possible, connect the concept to a real situation a student can imagine.
+
 Return ONLY valid JSON — no markdown, no explanation, just the JSON object:
 
 {
@@ -3743,7 +3726,7 @@ Return ONLY valid JSON — no markdown, no explanation, just the JSON object:
       "type": "concept",
       "heading": "Concept Name",
       "bullets": ["Key point one", "Key point two", "Key point three"],
-      "narration": "Natural 3-5 sentence spoken explanation. Flow like a professor speaking to students, don't just read the bullets.",
+      "narration": "Natural 3-5 sentence spoken explanation. Flow like a professor speaking to students, don't just read the bullets. Include why it matters and one quick intuitive example or analogy.",
       "duration_seconds": 20
     },
     {
@@ -3752,7 +3735,7 @@ Return ONLY valid JSON — no markdown, no explanation, just the JSON object:
       "term": "Technical Term",
       "definition": "Clear one-sentence definition.",
       "example": "Concrete real-world example (optional)",
-      "narration": "Natural 2-3 sentence spoken explanation including why this term matters.",
+      "narration": "Natural 2-3 sentence spoken explanation including why this term matters and where a student would see it in practice.",
       "duration_seconds": 14
     },
     {
@@ -3760,7 +3743,7 @@ Return ONLY valid JSON — no markdown, no explanation, just the JSON object:
       "type": "example",
       "heading": "Example or Application",
       "bullets": ["Step or detail one", "Step or detail two", "Step or detail three"],
-      "narration": "Walk through the example naturally, 3-4 sentences.",
+      "narration": "Walk through the example naturally, 3-4 sentences. End with a quick reflective question or check-in.",
       "duration_seconds": 18
     },
     {
@@ -3778,10 +3761,14 @@ Rules:
 - Generate exactly 8-14 slides
 - First slide: type "title". Last slide: type "summary"
 - Mix concept, definition, example slides based on actual content
+- Include at least 2 "example" slides when the material has enough substance
+- At least half of the non-title slides should contain either a concrete example, application, worked step, scenario, or check-for-understanding moment
 - Narration sounds NATURAL when spoken aloud — conversational, not bullet-reading
+- Narration should teach through examples instead of repeating slide text
 - Bullets: max 4 per slide, short phrases only (5-8 words each)
 - duration_seconds ≈ narration word count ÷ 2.3
 - Focus on the most important ideas from the material
+- Avoid generic wording; use actual concepts from the source material
 
 Material title: "${title || "Course Material"}"
 

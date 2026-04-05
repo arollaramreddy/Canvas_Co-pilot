@@ -1,13 +1,56 @@
 :root {
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: "Avenir Next", "Inter", "Segoe UI", sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color: #0f172a;
-  background: #f4f7fb;
+  color: #f5f7ff;
+  background:
+    radial-gradient(circle at top, rgba(99, 102, 241, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(217, 70, 239, 0.16), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.14), transparent 22%),
+    radial-gradient(circle at bottom left, rgba(249, 115, 22, 0.12), transparent 24%),
+    linear-gradient(180deg, #0d0d0d 0%, #121212 48%, #1a1a1f 100%);
+  --bg-0: #0d0d0d;
+  --bg-1: #121212;
+  --bg-2: #1e1e1e;
+  --bg-3: #24242a;
+  --surface: rgba(18, 18, 20, 0.7);
+  --surface-strong: rgba(22, 22, 28, 0.86);
+  --surface-soft: rgba(255, 255, 255, 0.04);
+  --border: rgba(255, 255, 255, 0.08);
+  --text-1: #f5f7ff;
+  --text-2: #c3c8dc;
+  --text-3: #8d96b2;
+  --accent-purple: #8b5cf6;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #22d3ee;
+  --accent-pink: #d946ef;
+  --shadow-lg: 0 30px 80px rgba(0, 0, 0, 0.45);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --scroll-y: 0;
+}
+
+:root[data-theme="light"] {
+  color: #142133;
+  background:
+    radial-gradient(circle at top left, rgba(99, 102, 241, 0.1), transparent 24%),
+    radial-gradient(circle at top right, rgba(217, 70, 239, 0.08), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(34, 211, 238, 0.08), transparent 22%),
+    linear-gradient(180deg, #f8fbff 0%, #eef2f7 100%);
+  --bg-0: #f8fbff;
+  --bg-1: #eef2f7;
+  --bg-2: #ffffff;
+  --bg-3: #f5f7fb;
+  --surface: rgba(255, 255, 255, 0.84);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --surface-soft: rgba(15, 23, 42, 0.04);
+  --border: rgba(20, 33, 51, 0.08);
+  --text-1: #142133;
+  --text-2: #607086;
+  --text-3: #7a8799;
+  --shadow-lg: 0 24px 60px rgba(20, 33, 51, 0.08);
 }
 
 * {
@@ -21,7 +64,21 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  background: #f4f7fb;
+  background:
+    radial-gradient(circle at 12% calc(8% + (var(--scroll-y) * 0.02px)), rgba(139, 92, 246, 0.17), transparent 24%),
+    radial-gradient(circle at 78% calc(14% + (var(--scroll-y) * 0.03px)), rgba(217, 70, 239, 0.12), transparent 20%),
+    radial-gradient(circle at 88% calc(16% + (var(--scroll-y) * 0.04px)), rgba(34, 211, 238, 0.13), transparent 22%),
+    radial-gradient(circle at 20% calc(70% + (var(--scroll-y) * 0.015px)), rgba(249, 115, 22, 0.1), transparent 22%),
+    linear-gradient(180deg, #0d0d0d 0%, #121212 48%, #1a1a1f 100%);
+  color: var(--text-1);
+}
+
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 12% calc(8% + (var(--scroll-y) * 0.02px)), rgba(139, 92, 246, 0.08), transparent 24%),
+    radial-gradient(circle at 78% calc(14% + (var(--scroll-y) * 0.03px)), rgba(217, 70, 239, 0.06), transparent 20%),
+    radial-gradient(circle at 88% calc(16% + (var(--scroll-y) * 0.04px)), rgba(34, 211, 238, 0.08), transparent 22%),
+    linear-gradient(180deg, #f8fbff 0%, #eef2f7 100%);
 }
 
 button,
@@ -37,4 +94,9 @@ textarea {
 
 a {
   color: inherit;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: #ffffff;
 }

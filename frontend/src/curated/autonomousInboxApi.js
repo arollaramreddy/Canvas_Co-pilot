@@ -142,6 +142,19 @@ async function loadMessages(limit = 20) {
   });
 }
 
+async function loadStateEvents(limit = 40) {
+  return fetchJson(`/state-events?limit=${encodeURIComponent(limit)}`, {
+    headers: {},
+  });
+}
+
+async function runAgenticWorkflow(payload) {
+  return fetchJson("/agentic-workflow", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 async function draftReply(messageId) {
   return fetchJson(`/messages/${messageId}/draft-reply`, {
     method: "POST",
@@ -162,7 +175,9 @@ export {
   loadPreferences,
   loadMessages,
   loadRuntimeState,
+  loadStateEvents,
   messageMatchesUser,
+  runAgenticWorkflow,
   runAutonomousMonitor,
   savePreferences,
   sendReply,

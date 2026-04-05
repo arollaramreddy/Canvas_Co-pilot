@@ -93,6 +93,11 @@
   box-shadow: 0 14px 40px rgba(15, 23, 42, 0.06);
 }
 
+.side-stack {
+  display: grid;
+  gap: 24px;
+}
+
 .section-tag,
 .settings-tag {
   background: #f2f4f7;
@@ -112,6 +117,11 @@
   border-radius: 22px;
   background: linear-gradient(180deg, #ffffff, #f9fbff);
   border: 1px solid rgba(30, 41, 59, 0.08);
+}
+
+.material-card-active {
+  border-color: rgba(37, 99, 235, 0.24);
+  box-shadow: 0 10px 28px rgba(37, 99, 235, 0.1);
 }
 
 .agent-card-top {
@@ -197,6 +207,40 @@
   gap: 8px;
   color: #344054;
   font-weight: 600;
+}
+
+.material-workflow-stack,
+.workflow-list {
+  display: grid;
+  gap: 14px;
+}
+
+.workflow-section {
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid rgba(30, 41, 59, 0.08);
+}
+
+.workflow-section h4 {
+  margin: 10px 0 4px;
+  color: #101828;
+}
+
+.workflow-section p,
+.workflow-text,
+.workflow-line span {
+  color: #667085;
+}
+
+.workflow-text {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.workflow-line {
+  display: grid;
+  gap: 4px;
 }
 
 .settings-field select {

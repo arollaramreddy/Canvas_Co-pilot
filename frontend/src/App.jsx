@@ -23,12 +23,17 @@ function App() {
     error: autonomousError,
     feed,
     loading: autonomousLoading,
+    materialCards,
+    materialLoading,
+    materialWorkflow,
     draftingMessageId,
+    onOpenMaterial,
     onDraftReply,
     onPreferenceChange,
     onSendReply,
     preferences,
     sendingMessageId,
+    selectedMaterial,
     syncNow,
     syncing,
   } = useAutonomousInboxFeed(undefined, user?.name || "");
@@ -215,9 +220,14 @@ function App() {
                     feed={feed}
                     preferences={preferences}
                     draftingMessageId={draftingMessageId}
+                    materialCards={materialCards}
+                    materialLoading={materialLoading}
+                    materialWorkflow={materialWorkflow}
+                    onOpenMaterial={onOpenMaterial}
                     onDraftReply={onDraftReply}
                     onSendReply={onSendReply}
                     onPreferenceChange={onPreferenceChange}
+                    selectedMaterial={selectedMaterial}
                     sendingMessageId={sendingMessageId}
                   />
                 )}

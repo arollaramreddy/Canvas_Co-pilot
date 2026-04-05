@@ -4,6 +4,8 @@ import {
   draftReply,
   loadMessages,
   loadRuntimeState,
+  loadStateEvents,
+  runAgenticWorkflow,
   runAutonomousMonitor,
   savePreferences,
   sendReply,
@@ -27,11 +29,51 @@ function setNestedValue(object, path, value) {
   return result;
 }
 
+function resolveMaterialContext(runtimeState, event) {
+  const workspace = runtimeState?.canvas?.normalizedWorkspace;
+  const courseId = String(event?.course_id || "");
+  const detail = event?.detail || {};
+  const moduleId = String(detail.moduleId || "");
+  const course = workspace?.byId?.courses?.[courseId] || null;
+  const module = workspace?.byId?.modules?.[moduleId] || null;
+  const moduleItems = workspace?.moduleItems || [];
+  const item =
+    moduleItems.find((entry) => String(entry.id) === String(event?.entity_id || "")) ||
+    moduleItems.find((entry) => String(entry.content_id || "") === String(event?.entity_id || "")) ||
+    moduleItems.find(
+      (entry) =>
+        String(entry.module_id || "") === moduleId &&
+        String(entry.display_name || "").trim() === String(event?.title || "").trim()
+    ) ||
+    null;
+
+  return {
+    eventId: event?.id,
+    eventType: event?.event_type,
+    courseId,
+    courseName: course?.name || `Course ${courseId}`,
+    moduleId: moduleId || item?.module_id || "",
+    moduleName: module?.name || detail.moduleName || item?.module_name || "Module",
+    topicId: item?.id ? String(item.id) : null,
+    fileName: item?.display_name || event?.title || "New material",
+    entityId: event?.entity_id || null,
+    createdAt: event?.created_at || null,
+    subtitle:
+      event?.event_type === "new_module_posted"
+        ? "Professor posted a new module"
+        : "Professor posted new course material",
+  };
+}
+
 export default function useAutonomousInboxFeed(initialParams, currentUserName = "") {
   const stableParams = initialParams || EMPTY_PARAMS;
   const [runtimeState, setRuntimeState] = useState(null);
   const [rawMessages, setRawMessages] = useState([]);
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const [stateEvents, setStateEvents] = useState([]);
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [materialWorkflow, setMaterialWorkflow] = useState(null);
+  const [materialLoading, setMaterialLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [draftingMessageId, setDraftingMessageId] = useState(null);
@@ -47,6 +89,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
         loadRuntimeState(stableParams),
         loadMessages(20),
       ]);
+      const eventsResult = await loadStateEvents(40).catch(() => []);
 
       if (messagesResult.status === "fulfilled") {
         setRawMessages(messagesResult.value || []);
@@ -63,6 +106,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
         }
         setError(runtimeResult.reason?.message || "Runtime state unavailable, showing raw inbox only");
       }
+      setStateEvents(eventsResult || []);
     } catch (err) {
       setError(err.message || "Failed to load autonomous inbox state");
     } finally {
@@ -79,6 +123,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
         loadRuntimeState(stableParams),
         loadMessages(20),
       ]);
+      const eventsResult = await loadStateEvents(40).catch(() => []);
 
       if (messagesResult.status === "fulfilled") {
         setRawMessages(messagesResult.value || []);
@@ -95,6 +140,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
         }
         setError(runtimeResult.reason?.message || "Runtime state unavailable, showing raw inbox only");
       }
+      setStateEvents(eventsResult || []);
     } catch (err) {
       setError(err.message || "Failed to sync autonomous inbox state");
     } finally {
@@ -168,12 +214,53 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
     [runtimeState, preferences, rawMessages, currentUserName]
   );
 
+  const materialCards = useMemo(
+    () =>
+      (stateEvents || [])
+        .filter(
+          (event) =>
+            event?.event_type === "new_material_posted" || event?.event_type === "new_module_posted"
+        )
+        .map((event) => resolveMaterialContext(runtimeState, event))
+        .filter((item) => item.courseId),
+    [runtimeState, stateEvents]
+  );
+
+  const onOpenMaterial = useCallback(
+    async (item) => {
+      if (!item?.courseId) return;
+      setSelectedMaterial(item);
+      setMaterialWorkflow(null);
+      setMaterialLoading(true);
+      setError("");
+      try {
+        const workflow = await runAgenticWorkflow({
+          courseId: item.courseId,
+          moduleId: item.moduleId || null,
+          topicId: item.topicId || null,
+          workflowType: item.topicId ? "topic_deep_dive" : "module_mastery",
+          preferences,
+        });
+        setMaterialWorkflow(workflow);
+      } catch (err) {
+        setError(err.message || "Failed to generate learning material");
+      } finally {
+        setMaterialLoading(false);
+      }
+    },
+    [preferences]
+  );
+
   return {
     drafts,
     error,
     feed,
     loading,
+    materialCards,
+    materialLoading,
+    materialWorkflow,
     draftingMessageId,
+    onOpenMaterial,
     onDraftReply,
     onPreferenceChange,
     onSendReply,
@@ -181,6 +268,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
     rawMessages,
     refresh,
     runtimeState,
+    selectedMaterial,
     sendingMessageId,
     syncNow,
     syncing,

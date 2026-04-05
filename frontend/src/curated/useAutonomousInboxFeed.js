@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildFeed,
+  createAnimatedVideoJob,
   draftReply,
+  loadDashboardMaterials,
   loadMessages,
   loadRuntimeState,
   loadStateEvents,
-  runAgenticWorkflow,
+  pollAnimatedVideoJob,
   runAutonomousMonitor,
+  retryDashboardMaterial,
   savePreferences,
   sendReply,
 } from "./autonomousInboxApi";
@@ -29,42 +32,6 @@ function setNestedValue(object, path, value) {
   return result;
 }
 
-function resolveMaterialContext(runtimeState, event) {
-  const workspace = runtimeState?.canvas?.normalizedWorkspace;
-  const courseId = String(event?.course_id || "");
-  const detail = event?.detail || {};
-  const moduleId = String(detail.moduleId || "");
-  const course = workspace?.byId?.courses?.[courseId] || null;
-  const module = workspace?.byId?.modules?.[moduleId] || null;
-  const moduleItems = workspace?.moduleItems || [];
-  const item =
-    moduleItems.find((entry) => String(entry.id) === String(event?.entity_id || "")) ||
-    moduleItems.find((entry) => String(entry.content_id || "") === String(event?.entity_id || "")) ||
-    moduleItems.find(
-      (entry) =>
-        String(entry.module_id || "") === moduleId &&
-        String(entry.display_name || "").trim() === String(event?.title || "").trim()
-    ) ||
-    null;
-
-  return {
-    eventId: event?.id,
-    eventType: event?.event_type,
-    courseId,
-    courseName: course?.name || `Course ${courseId}`,
-    moduleId: moduleId || item?.module_id || "",
-    moduleName: module?.name || detail.moduleName || item?.module_name || "Module",
-    topicId: item?.id ? String(item.id) : null,
-    fileName: item?.display_name || event?.title || "New material",
-    entityId: event?.entity_id || null,
-    createdAt: event?.created_at || null,
-    subtitle:
-      event?.event_type === "new_module_posted"
-        ? "Professor posted a new module"
-        : "Professor posted new course material",
-  };
-}
-
 export default function useAutonomousInboxFeed(initialParams, currentUserName = "") {
   const stableParams = initialParams || EMPTY_PARAMS;
   const [runtimeState, setRuntimeState] = useState(null);
@@ -72,7 +39,8 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
   const [stateEvents, setStateEvents] = useState([]);
   const [selectedMaterial, setSelectedMaterial] = useState(null);
-  const [materialWorkflow, setMaterialWorkflow] = useState(null);
+  const [selectedMaterialView, setSelectedMaterialView] = useState("summary");
+  const [dashboardMaterials, setDashboardMaterials] = useState([]);
   const [materialLoading, setMaterialLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -81,13 +49,18 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
   const [drafts, setDrafts] = useState({});
   const [error, setError] = useState("");
 
+  // ── Animated video job state ────────────────────────────
+  const [animatedVideoJobs, setAnimatedVideoJobs] = useState({});
+  const pollTimersRef = useRef({});
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [runtimeResult, messagesResult] = await Promise.allSettled([
+      const [runtimeResult, messagesResult, materialsResult] = await Promise.allSettled([
         loadRuntimeState(stableParams),
         loadMessages(20),
+        loadDashboardMaterials(24),
       ]);
       const eventsResult = await loadStateEvents(40).catch(() => []);
 
@@ -106,6 +79,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
         }
         setError(runtimeResult.reason?.message || "Runtime state unavailable, showing raw inbox only");
       }
+      setDashboardMaterials(materialsResult.status === "fulfilled" ? materialsResult.value || [] : []);
       setStateEvents(eventsResult || []);
     } catch (err) {
       setError(err.message || "Failed to load autonomous inbox state");
@@ -119,9 +93,10 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
     setError("");
     try {
       await runAutonomousMonitor();
-      const [runtimeResult, messagesResult] = await Promise.allSettled([
+      const [runtimeResult, messagesResult, materialsResult] = await Promise.allSettled([
         loadRuntimeState(stableParams),
         loadMessages(20),
+        loadDashboardMaterials(24),
       ]);
       const eventsResult = await loadStateEvents(40).catch(() => []);
 
@@ -140,6 +115,7 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
         }
         setError(runtimeResult.reason?.message || "Runtime state unavailable, showing raw inbox only");
       }
+      setDashboardMaterials(materialsResult.status === "fulfilled" ? materialsResult.value || [] : []);
       setStateEvents(eventsResult || []);
     } catch (err) {
       setError(err.message || "Failed to sync autonomous inbox state");
@@ -215,61 +191,128 @@ export default function useAutonomousInboxFeed(initialParams, currentUserName = 
   );
 
   const materialCards = useMemo(
-    () =>
-      (stateEvents || [])
-        .filter(
-          (event) =>
-            event?.event_type === "new_material_posted" || event?.event_type === "new_module_posted"
-        )
-        .map((event) => resolveMaterialContext(runtimeState, event))
-        .filter((item) => item.courseId),
-    [runtimeState, stateEvents]
+    () => dashboardMaterials,
+    [dashboardMaterials]
   );
 
   const onOpenMaterial = useCallback(
-    async (item) => {
-      if (!item?.courseId) return;
+    async (item, view = "summary") => {
+      if (!item?.id) return;
       setSelectedMaterial(item);
-      setMaterialWorkflow(null);
-      setMaterialLoading(true);
-      setError("");
-      try {
-        const workflow = await runAgenticWorkflow({
-          courseId: item.courseId,
-          moduleId: item.moduleId || null,
-          topicId: item.topicId || null,
-          workflowType: item.topicId ? "topic_deep_dive" : "module_mastery",
-          preferences,
-        });
-        setMaterialWorkflow(workflow);
-      } catch (err) {
-        setError(err.message || "Failed to generate learning material");
-      } finally {
-        setMaterialLoading(false);
-      }
+      setSelectedMaterialView(view);
     },
-    [preferences]
+    []
   );
 
+  const onRetryMaterial = useCallback(async (item) => {
+    if (!item?.id) return;
+    setMaterialLoading(true);
+    setError("");
+    try {
+      await retryDashboardMaterial(item.id);
+      await syncNow();
+    } catch (err) {
+      setError(err.message || "Failed to retry dashboard material");
+    } finally {
+      setMaterialLoading(false);
+    }
+  }, [syncNow]);
+
+  useEffect(() => {
+    if (!selectedMaterial?.id) return;
+    const nextSelected = (dashboardMaterials || []).find(
+      (item) => String(item.id) === String(selectedMaterial.id)
+    );
+    if (nextSelected) {
+      setSelectedMaterial(nextSelected);
+    }
+  }, [dashboardMaterials, selectedMaterial?.id]);
+
+  // ── Animated video: start job + poll ────────────────────
+  const startAnimatedVideo = useCallback(async (item) => {
+    if (!item?.lesson?.slides?.length) return;
+    const materialId = item.id;
+    setError("");
+
+    // Prevent duplicate creation
+    const existing = animatedVideoJobs[materialId];
+    if (existing && existing.status !== "failed") return;
+
+    try {
+      const result = await createAnimatedVideoJob(item.lesson, item.materialEntityId || null);
+      const jobId = result.jobId;
+      setAnimatedVideoJobs((prev) => ({
+        ...prev,
+        [materialId]: { jobId, status: "queued", progressMessage: "Queued for rendering" },
+      }));
+
+      // Start polling
+      const poll = () => {
+        const timer = setInterval(async () => {
+          try {
+            const status = await pollAnimatedVideoJob(jobId);
+            setAnimatedVideoJobs((prev) => ({
+              ...prev,
+              [materialId]: {
+                jobId,
+                status: status.status,
+                progressMessage: status.progressMessage || "",
+                videoUrl: status.videoUrl || null,
+                lessonPackage: status.lessonPackage || null,
+                error: status.error || "",
+              },
+            }));
+            if (status.status === "ready" || status.status === "failed") {
+              clearInterval(timer);
+              delete pollTimersRef.current[materialId];
+            }
+          } catch {
+            clearInterval(timer);
+            delete pollTimersRef.current[materialId];
+          }
+        }, 4000);
+        pollTimersRef.current[materialId] = timer;
+      };
+      poll();
+    } catch (err) {
+      setError(err.message || "Failed to start animated video generation");
+      setAnimatedVideoJobs((prev) => ({
+        ...prev,
+        [materialId]: { status: "failed", error: err.message },
+      }));
+    }
+  }, [animatedVideoJobs]);
+
+  // Clean up poll timers on unmount
+  useEffect(() => {
+    const timers = pollTimersRef.current;
+    return () => {
+      Object.values(timers).forEach(clearInterval);
+    };
+  }, []);
+
   return {
+    animatedVideoJobs,
     drafts,
     error,
     feed,
     loading,
     materialCards,
     materialLoading,
-    materialWorkflow,
     draftingMessageId,
     onOpenMaterial,
     onDraftReply,
     onPreferenceChange,
+    onRetryMaterial,
     onSendReply,
     preferences,
     rawMessages,
     refresh,
     runtimeState,
     selectedMaterial,
+    selectedMaterialView,
     sendingMessageId,
+    startAnimatedVideo,
     syncNow,
     syncing,
   };

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { registerMaterialItemsFromEvents } = require("./material-pipeline");
 const GLOBAL_INBOX_SCOPE = "__global_inbox__";
 
 function normalizeStateForSnapshot(state) {
@@ -124,6 +125,7 @@ function diffStates(previousState, nextState, userId) {
               moduleName: module.name,
               itemType: item.type,
               isPdf: item.is_pdf,
+              courseName: nextState.course.name,
             },
           })
         );
@@ -476,6 +478,7 @@ function syncCanvasStateToEvents({ db, userId, courseId, state }) {
   const detectedEvents = diffStates(previous?.snapshot || null, normalized, userId);
   const snapshotId = saveSnapshot(db, userId, courseId, "workspace_state", normalized);
   const savedEvents = saveEvents(db, detectedEvents);
+  registerMaterialItemsFromEvents(db, savedEvents);
   const jobs = enqueueWorkflowJobs(db, savedEvents);
 
   return {
@@ -492,6 +495,7 @@ function syncInboxStateToEvents({ db, userId, state }) {
   const detectedEvents = diffInboxStates(previous?.snapshot || null, normalized, userId);
   const snapshotId = saveSnapshot(db, userId, GLOBAL_INBOX_SCOPE, "inbox_state", normalized);
   const savedEvents = saveEvents(db, detectedEvents);
+  registerMaterialItemsFromEvents(db, savedEvents);
   const jobs = enqueueWorkflowJobs(db, savedEvents);
 
   return {

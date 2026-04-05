@@ -148,6 +148,12 @@ async function loadStateEvents(limit = 40) {
   });
 }
 
+async function loadDashboardMaterials(limit = 30) {
+  return fetchJson(`/dashboard/materials?limit=${encodeURIComponent(limit)}`, {
+    headers: {},
+  });
+}
+
 async function runAgenticWorkflow(payload) {
   return fetchJson("/agentic-workflow", {
     method: "POST",
@@ -169,16 +175,40 @@ async function sendReply(messageId, body) {
   });
 }
 
+async function retryDashboardMaterial(itemId) {
+  return fetchJson(`/dashboard/materials/${encodeURIComponent(itemId)}/retry`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+async function createAnimatedVideoJob(lesson, sourceFileId = null) {
+  return fetchJson("/generate-animated-lesson", {
+    method: "POST",
+    body: JSON.stringify({ lesson, sourceFileId }),
+  });
+}
+
+async function pollAnimatedVideoJob(jobId) {
+  return fetchJson(`/generate-animated-lesson/${encodeURIComponent(jobId)}`, {
+    headers: {},
+  });
+}
+
 export {
   buildFeed,
+  createAnimatedVideoJob,
   draftReply,
+  loadDashboardMaterials,
   loadPreferences,
   loadMessages,
   loadRuntimeState,
   loadStateEvents,
   messageMatchesUser,
+  pollAnimatedVideoJob,
   runAgenticWorkflow,
   runAutonomousMonitor,
+  retryDashboardMaterial,
   savePreferences,
   sendReply,
 };

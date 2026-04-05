@@ -538,6 +538,12 @@
   color: #314155;
 }
 
+.manual-animated-lesson-panel {
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
 .manual-table-wrap {
   overflow: auto;
 }

@@ -4,10 +4,21 @@ const { DatabaseSync } = require("node:sqlite");
 
 const dataDir = path.join(__dirname, "..", "data");
 fs.mkdirSync(dataDir, { recursive: true });
+const databasePath = path.join(dataDir, "copilot.db");
 
-const db = new DatabaseSync(path.join(dataDir, "copilot.db"));
+function applyPragmas(database) {
+  database.exec(`
+    PRAGMA journal_mode=WAL;
+    PRAGMA busy_timeout=15000;
+    PRAGMA synchronous=NORMAL;
+    PRAGMA temp_store=FILE;
+    PRAGMA foreign_keys=ON;
+    PRAGMA wal_autocheckpoint=100;
+  `);
+}
 
-db.exec(`
+function initializeSchema(database) {
+  database.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     name TEXT,
@@ -142,7 +153,132 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
-`);
+
+  CREATE TABLE IF NOT EXISTS material_pipeline_items (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    course_id TEXT,
+    source_event_id INTEGER,
+    material_entity_id TEXT,
+    course_name TEXT,
+    module_id TEXT,
+    module_name TEXT,
+    material_title TEXT,
+    status TEXT DEFAULT 'new',
+    summary_preview TEXT,
+    summary_markdown TEXT,
+    cleaned_text TEXT,
+    narration_script TEXT,
+    lesson_json TEXT,
+    audio_manifest_json TEXT,
+    video_payload_json TEXT,
+    error_text TEXT,
+    ready_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_material_pipeline_unique
+  ON material_pipeline_items(user_id, course_id, material_entity_id);
+
+  CREATE TABLE IF NOT EXISTS animated_video_jobs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    source_file_id TEXT,
+    title TEXT,
+    status TEXT DEFAULT 'queued',
+    progress_message TEXT,
+    lesson_json TEXT,
+    lesson_package_json TEXT,
+    video_url TEXT,
+    video_file_name TEXT,
+    error_text TEXT,
+    ready_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  `);
+}
+
+function openDatabase() {
+  const database = new DatabaseSync(databasePath);
+  applyPragmas(database);
+  initializeSchema(database);
+  return database;
+}
+
+function closeDatabase(database) {
+  if (database && typeof database.close === "function") {
+    database.close();
+  }
+}
+
+function withDatabase(callback) {
+  const database = openDatabase();
+  try {
+    return callback(database);
+  } finally {
+    closeDatabase(database);
+  }
+}
+
+async function withDatabaseAsync(callback) {
+  const database = openDatabase();
+  try {
+    return await callback(database);
+  } finally {
+    closeDatabase(database);
+  }
+}
+
+// Lazy singleton for backward compat – prefer withDatabase() for writes
+let _sharedDb = null;
+function getSharedDb() {
+  if (!_sharedDb) {
+    _sharedDb = openDatabase();
+  }
+  return _sharedDb;
+}
+
+// Safe wrapper that retries on SQLITE_BUSY / database-is-locked errors
+function withDatabaseRetry(callback, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const database = openDatabase();
+    try {
+      return callback(database);
+    } catch (err) {
+      closeDatabase(database);
+      if (attempt < retries - 1 && /database is locked|SQLITE_BUSY/i.test(String(err?.message || err))) {
+        const delay = 100 * Math.pow(2, attempt);
+        const end = Date.now() + delay;
+        while (Date.now() < end) { /* busy-wait for sync code */ }
+        continue;
+      }
+      throw err;
+    } finally {
+      // close is safe to call multiple times
+      closeDatabase(database);
+    }
+  }
+}
+
+async function withDatabaseAsyncRetry(callback, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const database = openDatabase();
+    try {
+      return await callback(database);
+    } catch (err) {
+      closeDatabase(database);
+      if (attempt < retries - 1 && /database is locked|SQLITE_BUSY/i.test(String(err?.message || err))) {
+        await new Promise((r) => setTimeout(r, 100 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw err;
+    } finally {
+      closeDatabase(database);
+    }
+  }
+}
 
 const FEATURE_CATALOG = [
   { id: "course_brief", group: "planning", title: "Course Brief", status: "live" },
@@ -202,7 +338,14 @@ const FEATURE_CATALOG = [
 ];
 
 module.exports = {
+  closeDatabase,
   dataDir,
-  db,
+  get db() { return getSharedDb(); },
+  databasePath,
   FEATURE_CATALOG,
+  openDatabase,
+  withDatabase,
+  withDatabaseAsync,
+  withDatabaseRetry,
+  withDatabaseAsyncRetry,
 };

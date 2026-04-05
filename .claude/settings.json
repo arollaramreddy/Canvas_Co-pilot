@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/suraj/Documents/**)",
+      "Bash(find /Users/suraj/Documents/Personal Projects/sparkling_papaya/frontend/src/animated-lessons -type f -name *.jsx -o -name *.js -o -name *.json)",
+      "Bash(node -e \"require\\(''./lib/animated-lesson''\\)\")",
+      "Bash(node -e \"require\\(''''./workers/animated-video-render-job''''\\)\")",
+      "Bash(node -e \":*)"
+    ]
+  }
+}

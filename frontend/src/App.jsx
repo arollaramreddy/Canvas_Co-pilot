@@ -22,19 +22,22 @@ function App() {
   const {
     drafts,
     error: autonomousError,
+    animatedVideoJobs,
     feed,
     loading: autonomousLoading,
     materialCards,
     materialLoading,
-    materialWorkflow,
     draftingMessageId,
     onOpenMaterial,
+    onRetryMaterial,
     onDraftReply,
     onPreferenceChange,
     onSendReply,
     preferences,
     sendingMessageId,
     selectedMaterial,
+    selectedMaterialView,
+    startAnimatedVideo,
     syncNow,
     syncing,
   } = useAutonomousInboxFeed(undefined, user?.name || "");
@@ -223,13 +226,16 @@ function App() {
                     draftingMessageId={draftingMessageId}
                     materialCards={materialCards}
                     materialLoading={materialLoading}
-                    materialWorkflow={materialWorkflow}
                     onOpenMaterial={onOpenMaterial}
+                    onRetryMaterial={onRetryMaterial}
                     onDraftReply={onDraftReply}
                     onSendReply={onSendReply}
                     onPreferenceChange={onPreferenceChange}
                     selectedMaterial={selectedMaterial}
+                    selectedMaterialView={selectedMaterialView}
                     sendingMessageId={sendingMessageId}
+                    animatedVideoJobs={animatedVideoJobs}
+                    onStartAnimatedVideo={startAnimatedVideo}
                   />
                 )}
 

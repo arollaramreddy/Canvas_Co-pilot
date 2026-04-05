@@ -7,6 +7,18 @@ const GENERATED_ROOT = path.join(__dirname, "..", "generated");
 const LESSON_AUDIO_DIR = path.join(GENERATED_ROOT, "lesson-audio");
 const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 const DEFAULT_MODEL_ID = "eleven_multilingual_v2";
+const TTS_MAX_RETRIES = 3;
+const TTS_BASE_DELAY_MS = 2000;
+
+// ── TTS Mutex ─────────────────────────────────────────────
+// Ensures only one ElevenLabs request runs at a time across the process.
+let _ttsQueue = Promise.resolve();
+
+function serializeTts(fn) {
+  const next = _ttsQueue.then(fn, fn);
+  _ttsQueue = next.catch(() => {});
+  return next;
+}
 
 function ensureLessonAudioDir() {
   fs.mkdirSync(LESSON_AUDIO_DIR, { recursive: true });
@@ -39,6 +51,64 @@ function buildAudioHash({ lessonTitle, slideId, text, voiceId, modelId }) {
     .slice(0, 16);
 }
 
+async function _callElevenLabs({ normalizedText, apiKey, voiceId, modelId, filePath }) {
+  for (let attempt = 0; attempt < TTS_MAX_RETRIES; attempt++) {
+    let response;
+    try {
+      response = await fetch(`${ELEVENLABS_API_URL}/${voiceId}`, {
+        method: "POST",
+        headers: {
+          "xi-api-key": apiKey,
+          "Content-Type": "application/json",
+          Accept: "audio/mpeg",
+        },
+        body: JSON.stringify({
+          text: normalizedText,
+          model_id: modelId,
+          output_format: "mp3_44100_128",
+          voice_settings: {
+            stability: 0.4,
+            similarity_boost: 0.8,
+            style: 0.3,
+            use_speaker_boost: true,
+          },
+        }),
+      });
+    } catch (networkErr) {
+      if (attempt < TTS_MAX_RETRIES - 1) {
+        const delay = TTS_BASE_DELAY_MS * Math.pow(2, attempt);
+        console.warn(`[tts] network error, retrying in ${delay}ms (attempt ${attempt + 1}):`, networkErr.message);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw new Error(`ElevenLabs network error after ${TTS_MAX_RETRIES} attempts: ${networkErr.message}`);
+    }
+
+    if (response.ok) {
+      const buffer = Buffer.from(await response.arrayBuffer());
+      fs.writeFileSync(filePath, buffer);
+      console.log(`[tts] audio saved ${path.basename(filePath)}`);
+      return;
+    }
+
+    const errorText = await response.text().catch(() => "");
+    const isRateLimit =
+      response.status === 429 ||
+      /concurrent_limit_exceeded|rate.limit|too.many/i.test(errorText);
+
+    if (isRateLimit && attempt < TTS_MAX_RETRIES - 1) {
+      const delay = TTS_BASE_DELAY_MS * Math.pow(2, attempt);
+      console.warn(`[tts] rate limited (${response.status}), retrying in ${delay}ms (attempt ${attempt + 1})`);
+      await new Promise((r) => setTimeout(r, delay));
+      continue;
+    }
+
+    throw new Error(
+      `ElevenLabs request failed (${response.status})${errorText ? `: ${errorText}` : ""}`
+    );
+  }
+}
+
 async function generateLessonSlideAudio({
   lessonTitle = "lesson",
   slideId = "slide",
@@ -64,37 +134,19 @@ async function generateLessonSlideAudio({
   const fileName = `${hash}.mp3`;
   const filePath = path.join(LESSON_AUDIO_DIR, fileName);
 
-  if (!fs.existsSync(filePath)) {
-    const response = await fetch(`${ELEVENLABS_API_URL}/${voiceId}`, {
-      method: "POST",
-      headers: {
-        "xi-api-key": apiKey,
-        "Content-Type": "application/json",
-        Accept: "audio/mpeg",
-      },
-      body: JSON.stringify({
-        text: normalizedText,
-        model_id: modelId,
-        output_format: "mp3_44100_128",
-        voice_settings: {
-          stability: 0.4,
-          similarity_boost: 0.8,
-          style: 0.3,
-          use_speaker_boost: true,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      throw new Error(
-        `ElevenLabs request failed (${response.status})${errorText ? `: ${errorText}` : ""}`
-      );
-    }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    fs.writeFileSync(filePath, buffer);
+  // Return cached audio immediately – no API call needed
+  if (fs.existsSync(filePath) && fs.statSync(filePath).size > 0) {
+    return {
+      fileName,
+      filePath,
+      url: `${backendUrl}/generated/lesson-audio/${fileName}`,
+    };
   }
+
+  // Serialize through the mutex so only one TTS request runs at a time
+  await serializeTts(() =>
+    _callElevenLabs({ normalizedText, apiKey, voiceId, modelId, filePath })
+  );
 
   return {
     fileName,

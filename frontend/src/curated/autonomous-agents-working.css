@@ -19,7 +19,8 @@
 .hero-chip,
 .section-tag,
 .settings-tag,
-.agent-pill {
+.agent-pill,
+.status-pill {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -186,6 +187,26 @@
   color: #2351c8;
 }
 
+.status-pill-new {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+.status-pill-processing {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+}
+
+.status-pill-ready {
+  background: rgba(34, 197, 94, 0.14);
+  color: #15803d;
+}
+
+.status-pill-failed {
+  background: rgba(239, 68, 68, 0.14);
+  color: #b42318;
+}
+
 .agent-pill-high {
   background: rgba(245, 158, 11, 0.14);
   color: #b45309;
@@ -243,6 +264,115 @@
   gap: 4px;
 }
 
+.material-detail-tabs {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.material-detail-tab {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #f2f4f7;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.material-detail-tab.active {
+  background: #e0ebff;
+  color: #1d4ed8;
+}
+
+.material-summary-panel {
+  margin-top: 8px;
+}
+
+.material-processing-card,
+.material-failed-card {
+  margin-top: 12px;
+}
+
+.material-video-shell {
+  margin-top: 14px;
+}
+
+.material-video-stage {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top left, rgba(29, 78, 216, 0.16), transparent 38%),
+    linear-gradient(160deg, #101828, #172554 55%, #111827);
+  color: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
+}
+
+.material-video-empty {
+  justify-items: center;
+  text-align: center;
+  min-height: 180px;
+  align-content: center;
+}
+
+.material-video-topbar,
+.material-video-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.material-video-badge,
+.material-video-counter {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.material-video-body {
+  min-height: 260px;
+  display: grid;
+  align-items: center;
+}
+
+.material-video-slide {
+  display: grid;
+  gap: 12px;
+}
+
+.material-video-slide h4 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.material-video-slide p,
+.material-video-bullets li,
+.material-audio-note {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.material-video-bullets {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.material-video-controls audio {
+  width: min(100%, 420px);
+}
+
+.material-audio-note {
+  margin: 0;
+  font-size: 13px;
+}
+
 .settings-field select {
   border: 1px solid #d0d5dd;
   border-radius: 14px;
@@ -265,5 +395,86 @@
 
   .hero-stats {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
+
+  .material-video-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .material-video-controls audio {
+    width: 100%;
+  }
+}
+
+/* ── Animated video section ─────────────────────────────── */
+
+.animated-video-section {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #f8f6ff 100%);
+  border: 1px solid rgba(30, 41, 59, 0.06);
+}
+
+.section-header-inline {
+  margin-bottom: 12px;
+}
+
+.animated-video-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-weight: 600;
+}
+
+.animated-video-status {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(30, 41, 59, 0.06);
+}
+
+.animated-video-status-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.animated-video-status p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.animated-video-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.animated-video-status-queued,
+.animated-video-status-rendering,
+.animated-video-status-encoding {
+  border-left: 3px solid #3b82f6;
+}
+
+.animated-video-status-ready {
+  border-left: 3px solid #22c55e;
+}
+
+.animated-video-status-failed {
+  border-left: 3px solid #dc2626;
+}
+
+.status-pill-queued {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-pill-rendering,
+.status-pill-encoding {
+  background: #dbeafe;
+  color: #1d4ed8;
 }

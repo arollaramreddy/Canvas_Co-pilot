@@ -49,6 +49,7 @@ function claimQueuedJobs(db, limit = 5) {
       SELECT id, user_id, course_id, source_event_id, job_type, priority, status, payload_json, created_at, updated_at
       FROM workflow_jobs
       WHERE status = 'queued'
+        AND job_type NOT IN ('material_ingestion', 'video_generation_candidate')
       ORDER BY
         CASE priority
           WHEN 'urgent' THEN 1

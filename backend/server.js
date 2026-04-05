@@ -4,7 +4,7 @@ const pdf = require("pdf-parse");
 const crypto = require("crypto");
 const path = require("path");
 const { Annotation, StateGraph, START, END } = require("@langchain/langgraph");
-const { db, FEATURE_CATALOG } = require("./lib/db");
+const { db, FEATURE_CATALOG, withDatabase, withDatabaseAsync } = require("./lib/db");
 const {
   computeInterventionScore,
   generateAutonomousReviewPlan,
@@ -21,10 +21,21 @@ const {
 const { processQueuedAgentJobs } = require("./lib/agent-workers");
 const { buildLangGraphRuntimeState } = require("./lib/langgraph-runtime");
 const {
+  listMaterialPipelineItems,
+  processQueuedMaterialJobs,
+} = require("./lib/material-pipeline");
+const {
   GENERATED_ROOT,
   ensureLessonAudioDir,
   generateLessonSlideAudio,
 } = require("./lib/lesson-audio");
+const {
+  createAnimatedVideoJob,
+  getAnimatedVideoJob,
+  processQueuedAnimatedVideoJobs,
+  recoverStaleAnimatedVideoJobs,
+} = require("./lib/animated-lesson");
+const { parseJsonResponse } = require("./lib/json-response");
 const {
   buildReplyDraftPrompt,
   classifyMessageIntent,
@@ -57,6 +68,8 @@ const sessionStore = new Map();
 const oauthStateStore = new Map();
 let agentWorkerBusy = false;
 let autonomousMonitorBusy = false;
+let materialPipelineBusy = false;
+let animatedVideoWorkerBusy = false;
 
 function parseCookies(req) {
   const cookieHeader = req.headers.cookie || "";
@@ -76,6 +89,15 @@ function getSession(req) {
 function getCanvasAccessToken(req) {
   const session = getSession(req);
   return session?.accessToken || null;
+}
+
+function resolveAccessTokenForUser(userId) {
+  for (const session of sessionStore.values()) {
+    if (String(session?.user?.id || "") === String(userId) && session?.accessToken) {
+      return session.accessToken;
+    }
+  }
+  return null;
 }
 
 function setSessionCookie(res, sessionId) {
@@ -283,6 +305,26 @@ function extractResponseText(response) {
     .map((item) => item.text)
     .join("\n\n")
     .trim();
+}
+
+async function repairModelJson({ originalText, extractedJson, errorMessage, label }) {
+  const repairResponse = await createOpenAIResponse({
+    model: process.env.OPENAI_MODEL_JSON_REPAIR || "gpt-4.1-mini",
+    input: `You repair malformed JSON produced by another model.
+
+Return ONLY valid JSON.
+Do not add commentary.
+Do not change field names or structure unless needed to make the JSON valid.
+Preserve the intended content as closely as possible.
+
+Label: ${label}
+Parse error: ${errorMessage}
+
+Malformed JSON candidate:
+${extractedJson || originalText}`,
+  });
+
+  return extractResponseText(repairResponse) || "";
 }
 
 // ── Canvas API helpers ────────────────────────────────────
@@ -1139,6 +1181,49 @@ setInterval(() => {
   }
 }, 15000);
 
+setInterval(async () => {
+  if (materialPipelineBusy) return;
+  materialPipelineBusy = true;
+  try {
+    await processQueuedMaterialJobs({
+      db,
+      resolveAccessTokenForUser,
+      canvasRequest,
+      downloadCanvasFile,
+      createOpenAIResponse,
+      extractResponseText,
+      generateLessonSlideAudio,
+      backendUrl: BACKEND_URL,
+      repairJson: repairModelJson,
+      limit: 2,
+    });
+  } catch (error) {
+    console.error("Material pipeline loop failed:", error.message);
+  } finally {
+    materialPipelineBusy = false;
+  }
+}, 12000);
+
+setInterval(async () => {
+  if (animatedVideoWorkerBusy) return;
+  animatedVideoWorkerBusy = true;
+  try {
+    await withDatabaseAsync((animatedJobDb) => {
+      // Recover jobs whose worker process died
+      recoverStaleAnimatedVideoJobs(animatedJobDb, 10);
+      return processQueuedAnimatedVideoJobs({
+        db: animatedJobDb,
+        backendUrl: BACKEND_URL,
+        limit: 1,
+      });
+    });
+  } catch (error) {
+    console.error("Animated video worker loop failed:", error.message);
+  } finally {
+    animatedVideoWorkerBusy = false;
+  }
+}, 6000);
+
 // ── Existing Endpoints ────────────────────────────────────
 
 app.get("/api/auth/config", (req, res) => {
@@ -1723,6 +1808,71 @@ app.get("/api/messages", async (req, res) => {
     res.json((inbox.messages || []).slice(0, limit));
   } catch (err) {
     res.status(err.status || 500).json({ error: `Failed to load messages: ${err.message}` });
+  }
+});
+
+app.get("/api/dashboard/materials", (req, res) => {
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) {
+      return res.status(401).json({ error: "No authenticated session" });
+    }
+
+    const limit = Number(req.query.limit || 30);
+    const items = listMaterialPipelineItems(db, context.userId, limit);
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to load dashboard materials: ${err.message}` });
+  }
+});
+
+app.post("/api/dashboard/materials/:itemId/retry", (req, res) => {
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) {
+      return res.status(401).json({ error: "No authenticated session" });
+    }
+
+    const item = db
+      .prepare(`
+        SELECT id, user_id, course_id, source_event_id
+        FROM material_pipeline_items
+        WHERE id = ? AND user_id = ?
+        LIMIT 1
+      `)
+      .get(String(req.params.itemId), context.userId);
+
+    if (!item) {
+      return res.status(404).json({ error: "Dashboard material not found" });
+    }
+
+    const jobId = crypto.randomBytes(12).toString("hex");
+    db.prepare(`
+      INSERT INTO workflow_jobs
+      (id, user_id, course_id, source_event_id, job_type, priority, status, payload_json, result_json, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      jobId,
+      item.user_id,
+      item.course_id,
+      item.source_event_id,
+      "material_ingestion",
+      "high",
+      "queued",
+      JSON.stringify({ retry: true, itemId: item.id }),
+      null,
+      new Date().toISOString()
+    );
+
+    db.prepare(`
+      UPDATE material_pipeline_items
+      SET status = 'new', error_text = NULL, updated_at = ?
+      WHERE id = ?
+    `).run(new Date().toISOString(), item.id);
+
+    res.json({ success: true, jobId, itemId: item.id });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to retry dashboard material: ${err.message}` });
   }
 });
 
@@ -2813,10 +2963,10 @@ ${truncated}`
     });
 
     const raw = extractResponseText(response) || "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Could not parse lesson JSON from response");
-
-    const lesson = JSON.parse(jsonMatch[0]);
+    const lesson = await parseJsonResponse(raw, {
+      label: "Lesson JSON",
+      repair: repairModelJson,
+    });
     res.json(lesson);
   } catch (err) {
     res.status(500).json({ error: `Lesson generation failed: ${err.message}` });
@@ -2844,6 +2994,77 @@ app.post("/api/generate-lesson-audio", async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: `Lesson audio generation failed: ${err.message}` });
+  }
+});
+
+app.post("/api/generate-animated-lesson", async (req, res) => {
+  const { lesson, sourceFileId = null } = req.body || {};
+  if (!lesson || !Array.isArray(lesson.slides) || !lesson.slides.length) {
+    return res.status(400).json({ error: "lesson with slides is required" });
+  }
+
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) {
+      return res.status(401).json({ error: "No authenticated session" });
+    }
+
+    const job = withDatabase((animatedJobDb) =>
+      createAnimatedVideoJob(animatedJobDb, {
+        userId: context.userId,
+        sourceFileId,
+        title: lesson.title || "Animated lesson",
+        lesson,
+      })
+    );
+
+    console.log(
+      `[animated-video] job created ${job.id} user=${context.userId} sourceFile=${sourceFileId || "none"}`
+    );
+
+    res.status(202).json({
+      jobId: job.id,
+      status: job.status,
+      progressMessage: job.progressMessage,
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Animated lesson generation failed: ${err.message}` });
+  }
+});
+
+app.get("/api/generate-animated-lesson/:jobId", async (req, res) => {
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) {
+      return res.status(401).json({ error: "No authenticated session" });
+    }
+
+    const job = withDatabase((animatedJobDb) =>
+      getAnimatedVideoJob(animatedJobDb, req.params.jobId, context.userId)
+    );
+    if (!job) {
+      return res.status(404).json({ error: "Animated lesson job not found" });
+    }
+
+    res.json({
+      jobId: job.id,
+      status: job.status,
+      progressMessage: job.progressMessage,
+      lessonPackage: job.lessonPackage
+        ? {
+            ...job.lessonPackage,
+            videoUrl: job.videoUrl,
+            videoFileName: job.videoFileName,
+            renderStatus: job.status,
+          }
+        : null,
+      videoUrl: job.videoUrl,
+      error: job.error,
+      readyAt: job.readyAt,
+      updatedAt: job.updatedAt,
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to load animated lesson job: ${err.message}` });
   }
 });
 

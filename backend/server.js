@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const pdf = require("pdf-parse");
 const crypto = require("crypto");
+const fs = require("fs");
 const path = require("path");
 const { Annotation, StateGraph, START, END } = require("@langchain/langgraph");
 const { db, FEATURE_CATALOG } = require("./lib/db");
@@ -42,8 +43,27 @@ app.use(express.json());
 ensureLessonAudioDir();
 app.use("/generated", express.static(GENERATED_ROOT));
 
-const CANVAS_BASE_URL =
-  process.env.CANVAS_BASE_URL || "https://canvas.asu.edu/api/v1";
+function normalizeCanvasApiBaseUrl(rawUrl) {
+  const fallback = "https://canvas.asu.edu/api/v1";
+  const input = String(rawUrl || fallback).trim();
+
+  if (!input) {
+    return fallback;
+  }
+
+  const withoutTrailingSlash = input.replace(/\/+$/, "");
+  if (withoutTrailingSlash.endsWith("/api/v1")) {
+    return withoutTrailingSlash;
+  }
+
+  if (withoutTrailingSlash.includes("/api/")) {
+    return withoutTrailingSlash;
+  }
+
+  return `${withoutTrailingSlash}/api/v1`;
+}
+
+const CANVAS_BASE_URL = normalizeCanvasApiBaseUrl(process.env.CANVAS_BASE_URL);
 const CANVAS_OAUTH_AUTHORIZE_URL =
   process.env.CANVAS_OAUTH_AUTHORIZE_URL || "https://canvas.asu.edu/login/oauth2/auth";
 const CANVAS_OAUTH_TOKEN_URL =
@@ -57,6 +77,9 @@ const sessionStore = new Map();
 const oauthStateStore = new Map();
 let agentWorkerBusy = false;
 let autonomousMonitorBusy = false;
+const DATA_DIR = path.join(__dirname, "data");
+const STUDY_PLAN_STORE = path.join(DATA_DIR, "study-plans.json");
+const QUIZ_STORE = path.join(DATA_DIR, "quizzes.json");
 
 function parseCookies(req) {
   const cookieHeader = req.headers.cookie || "";
@@ -128,6 +151,45 @@ function getSessionContext(req) {
     userId: session?.user?.id ? String(session.user.id) : null,
     session,
   };
+}
+
+function ensureJsonStore(filePath, seed) {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, JSON.stringify(seed, null, 2));
+  }
+}
+
+function readJsonStore(filePath, seed) {
+  ensureJsonStore(filePath, seed);
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch {
+    return seed;
+  }
+}
+
+function writeJsonStore(filePath, value) {
+  ensureJsonStore(filePath, value);
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+}
+
+function readStudyPlanStore() {
+  return readJsonStore(STUDY_PLAN_STORE, { plansByUser: {} });
+}
+
+function writeStudyPlanStore(value) {
+  writeJsonStore(STUDY_PLAN_STORE, value);
+}
+
+function readQuizStore() {
+  return readJsonStore(QUIZ_STORE, { quizzesByUser: {} });
+}
+
+function writeQuizStore(value) {
+  writeJsonStore(QUIZ_STORE, value);
 }
 
 function logActivity(req, eventType, payload = {}) {
@@ -307,6 +369,19 @@ async function canvasRequest(path, accessToken) {
     throw error;
   }
 
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const text = await res.text();
+    const error = new Error(
+      text.trim().startsWith("<")
+        ? "Canvas returned HTML instead of JSON. Check CANVAS_BASE_URL so it points to the Canvas API root."
+        : "Canvas returned a non-JSON response."
+    );
+    error.status = 502;
+    error.detail = text;
+    throw error;
+  }
+
   return res.json();
 }
 
@@ -329,6 +404,19 @@ async function canvasRequestAll(path, maxPages = 10, accessToken) {
       const text = await res.text();
       const error = new Error(`Canvas API error (${res.status})`);
       error.status = res.status;
+      error.detail = text;
+      throw error;
+    }
+
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.toLowerCase().includes("application/json")) {
+      const text = await res.text();
+      const error = new Error(
+        text.trim().startsWith("<")
+          ? "Canvas returned HTML instead of JSON. Check CANVAS_BASE_URL so it points to the Canvas API root."
+          : "Canvas returned a non-JSON response."
+      );
+      error.status = 502;
       error.detail = text;
       throw error;
     }
@@ -640,6 +728,392 @@ async function buildWorkspaceState(courseId, accessToken, options = {}) {
 
   workspaceSnapshotCache.set(cacheKey, { createdAt: Date.now(), data: state });
   return state;
+}
+
+function normalizePlanPreferences(preferences = {}) {
+  const startDate = String(preferences.startDate || new Date().toISOString().slice(0, 10));
+  const endDate = String(preferences.endDate || startDate);
+  return {
+    startDate,
+    endDate,
+    objective: String(preferences.objective || "Stay on track"),
+    hoursPerWeek: Math.max(1, Number(preferences.hoursPerWeek) || 8),
+    sessionMinutes: Math.max(15, Number(preferences.sessionMinutes) || 60),
+    pace: String(preferences.pace || "balanced"),
+    includeAssignments: preferences.includeAssignments !== false,
+    focusDays: Array.isArray(preferences.focusDays) ? preferences.focusDays.map(String) : [],
+    priorities: Array.isArray(preferences.priorities) ? preferences.priorities.map(String) : [],
+    selectedModuleIds: Array.isArray(preferences.selectedModuleIds)
+      ? preferences.selectedModuleIds.map(String)
+      : [],
+  };
+}
+
+async function resolveCourseSyllabus(courseId, accessToken) {
+  const course = await canvasRequest(`/courses/${courseId}?include[]=syllabus_body&include[]=term`, accessToken);
+  const syllabusHtml = String(course.syllabus_body || "");
+  const syllabusText = syllabusHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return {
+    course,
+    syllabusHtml,
+    syllabusText,
+    source: syllabusText ? "course.syllabus_body" : "course metadata",
+  };
+}
+
+async function getModuleResourceScope(courseId, modules, accessToken) {
+  return Promise.all(
+    modules.map(async (module) => {
+      const items = await getEnrichedModuleItems(courseId, module.id, accessToken).catch(() => []);
+      const resources = items.map((item) => ({
+        id: String(item.id),
+        title: item.display_name || item.filename || item.type || "Resource",
+        type: item.type || "Resource",
+        is_pdf: Boolean(item.is_pdf),
+      }));
+      return {
+        id: module.id,
+        name: module.name,
+        position: module.position,
+        resources,
+      };
+    })
+  );
+}
+
+function buildFallbackStudyPlan({ courseName, preferences, scopedModules, assignments, moduleResources, syllabusText }) {
+  const weeklyPlan = (scopedModules.length ? scopedModules : moduleResources).slice(0, 6).map((module, index) => {
+    const resources = moduleResources.find((entry) => String(entry.id) === String(module.id))?.resources || [];
+    const primaryResource = resources[0]?.title || "core material";
+    return {
+      day: `Week ${index + 1}`,
+      focus: `${module.name}: review the most important ideas and examples.`,
+      tasks: [
+        `Review ${module.name} and capture the main concepts.`,
+        `Study ${primaryResource}.`,
+        "Write 3 to 5 quick recall questions.",
+      ],
+    };
+  });
+
+  const milestoneModules = (scopedModules.length ? scopedModules : moduleResources).slice(0, 4);
+  const milestones = milestoneModules.map((module, index) => {
+    const assignment = assignments[index] || null;
+    const dueDate = assignment?.due_at || `${preferences.endDate}T12:00:00.000Z`;
+    return {
+      title: module.name,
+      dueDate,
+      reason: assignment
+        ? `Reach this checkpoint before ${assignment.name}.`
+        : "Complete this module by the checkpoint date.",
+    };
+  });
+
+  return {
+    overview:
+      syllabusText ||
+      `${courseName} study plan from ${preferences.startDate} to ${preferences.endDate}.`,
+    recommendations: [
+      `Study about ${preferences.hoursPerWeek} hours per week in ${preferences.sessionMinutes}-minute sessions.`,
+      scopedModules.length
+        ? `Focus on these modules: ${scopedModules.map((module) => module.name).join(", ")}.`
+        : "Use the selected course modules as your study scope.",
+    ],
+    weeklyPlan,
+    milestones,
+    customTips: [
+      "Use one session per week for self-testing.",
+      "Rebuild the plan if the module scope changes.",
+    ],
+  };
+}
+
+function buildFallbackQuiz({ title, courseName, moduleName, resources }) {
+  const topics = resources.slice(0, 6);
+  const questions = topics.map((resource, index) => ({
+    id: `q-${index + 1}`,
+    prompt: `Which statement best matches "${resource.title}"?`,
+    options: [
+      `It is an important topic from ${moduleName || courseName}.`,
+      "It is unrelated to the selected study material.",
+      "It only matters outside this course.",
+      "It should be skipped during review.",
+    ],
+    answerIndex: 0,
+    explanation: `"${resource.title}" is part of the selected material and should be reviewed.`,
+  }));
+
+  return {
+    title,
+    description: `Practice quiz for ${moduleName || courseName}.`,
+    questions,
+  };
+}
+
+async function extractCanvasFileText(courseId, fileId, accessToken) {
+  const fileIdStr = String(fileId);
+  if (textCache.has(fileIdStr)) {
+    return textCache.get(fileIdStr);
+  }
+
+  const file = await canvasRequest(`/courses/${courseId}/files/${fileIdStr}`, accessToken);
+  if (!file?.url) {
+    return "";
+  }
+
+  const isPdf =
+    (file.content_type || "").includes("pdf") ||
+    (file.filename || "").toLowerCase().endsWith(".pdf");
+  if (!isPdf) {
+    return "";
+  }
+
+  const buffer = await downloadCanvasFile(file.url, accessToken);
+  const pdfData = await pdf(buffer);
+  const text = String(pdfData.text || "").trim();
+  if (text) {
+    textCache.set(fileIdStr, text);
+  }
+  return text;
+}
+
+async function buildQuizSourceContext(courseId, modules, selectedFileIds, accessToken) {
+  const normalizedSelectedFileIds = Array.isArray(selectedFileIds)
+    ? selectedFileIds.map(String)
+    : [];
+
+  const moduleContexts = await Promise.all(
+    modules.map(async (module) => {
+      const items = await getEnrichedModuleItems(courseId, module.id, accessToken).catch(() => []);
+      const filteredItems = normalizedSelectedFileIds.length
+        ? items.filter((item) => normalizedSelectedFileIds.includes(String(item.id)))
+        : items;
+
+      const resources = filteredItems.map((item) => ({
+        id: String(item.id),
+        title: item.display_name || item.filename || item.type || "Resource",
+        type: item.type || "Resource",
+        is_pdf: Boolean(item.is_pdf),
+      }));
+
+      const candidateFiles = filteredItems.filter((item) => item.is_pdf).slice(0, 2);
+      const fileTexts = (
+        await Promise.all(
+          candidateFiles.map(async (item) => {
+            try {
+              const text = await extractCanvasFileText(courseId, item.id, accessToken);
+              if (!text) return null;
+              return {
+                id: String(item.id),
+                title: item.display_name || item.filename || "PDF",
+                text: text.slice(0, 6000),
+              };
+            } catch {
+              return null;
+            }
+          })
+        )
+      ).filter(Boolean);
+
+      return {
+        id: module.id,
+        name: module.name,
+        resources,
+        fileTexts,
+      };
+    })
+  );
+
+  return moduleContexts;
+}
+
+async function buildStudyPlanSourceContext(courseId, modules, accessToken) {
+  const moduleContexts = await buildQuizSourceContext(courseId, modules, [], accessToken);
+  return moduleContexts.map((module) => ({
+    ...module,
+    resources: (module.resources || []).slice(0, 8),
+    fileTexts: (module.fileTexts || []).slice(0, 2),
+  }));
+}
+
+async function generateStudyPlanWithAI({
+  courseName,
+  preferences,
+  scopedModules,
+  assignments,
+  syllabusText,
+  moduleContexts,
+}) {
+  const moduleSummary = moduleContexts
+    .map((module) => {
+      const resources = (module.resources || []).slice(0, 5).map((resource) => resource.title).join(", ");
+      return `- ${module.name}${resources ? `: ${resources}` : ""}`;
+    })
+    .join("\n");
+
+  const fileContext = moduleContexts
+    .flatMap((module) =>
+      (module.fileTexts || []).map((file) => `MODULE: ${module.name}\nFILE: ${file.title}\n${file.text}`)
+    )
+    .slice(0, 4)
+    .join("\n\n---\n\n");
+
+  const assignmentSummary = assignments
+    .slice(0, 8)
+    .map((assignment) => `- ${assignment.name}${assignment.due_at ? ` (due ${assignment.due_at})` : ""}`)
+    .join("\n");
+
+  const response = await createOpenAIResponse({
+    model: OPENAI_MODEL_SUMMARY,
+    input: `You are creating a practical study plan from real course content.
+
+Return ONLY valid JSON:
+{
+  "overview": "1-2 sentence overview",
+  "recommendations": ["tip 1", "tip 2"],
+  "weeklyPlan": [
+    {
+      "day": "Week 1",
+      "focus": "One short focus line",
+      "tasks": ["task 1", "task 2", "task 3"]
+    }
+  ],
+  "milestones": [
+    {
+      "title": "Checkpoint title",
+      "dueDate": "ISO date string",
+      "reason": "Why it matters"
+    }
+  ],
+  "customTips": ["tip 1", "tip 2"]
+}
+
+Rules:
+- Use the selected modules and file excerpts.
+- Make the weekly focus and tasks specific to the actual module resources.
+- Keep each task concise and actionable.
+- Use the provided plan window from ${preferences.startDate} to ${preferences.endDate}.
+- Include 2 to 6 weekly plan entries depending on scope.
+- Include 2 to 5 milestones.
+- Prefer assignments for milestone timing when relevant.
+- Do not output markdown.
+
+Course: ${courseName}
+Objective: ${preferences.objective}
+Hours per week: ${preferences.hoursPerWeek}
+Session minutes: ${preferences.sessionMinutes}
+Pace: ${preferences.pace}
+Focus days: ${(preferences.focusDays || []).join(", ") || "Not specified"}
+
+Syllabus:
+${(syllabusText || "").slice(0, 4000) || "No syllabus text available"}
+
+Selected modules:
+${moduleSummary || "- No module data available"}
+
+Assignments:
+${assignmentSummary || "- No assignment data available"}
+
+File excerpts:
+${fileContext || "No file excerpts available"}`,
+  });
+
+  const raw = extractResponseText(response) || "";
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Could not parse study plan JSON from model response");
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  return {
+    overview: String(parsed.overview || ""),
+    recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations.map(String) : [],
+    weeklyPlan: Array.isArray(parsed.weeklyPlan)
+      ? parsed.weeklyPlan.map((week, index) => ({
+          day: String(week.day || `Week ${index + 1}`),
+          focus: String(week.focus || ""),
+          tasks: Array.isArray(week.tasks) ? week.tasks.map(String).slice(0, 5) : [],
+        }))
+      : [],
+    milestones: Array.isArray(parsed.milestones)
+      ? parsed.milestones.map((milestone) => ({
+          title: String(milestone.title || "Checkpoint"),
+          dueDate: String(milestone.dueDate || `${preferences.endDate}T12:00:00.000Z`),
+          reason: String(milestone.reason || "Complete the planned work by this checkpoint."),
+        }))
+      : [],
+    customTips: Array.isArray(parsed.customTips) ? parsed.customTips.map(String) : [],
+  };
+}
+
+async function generateQuizWithAI({ title, courseName, moduleName, resources, fileTexts }) {
+  const resourceLines = resources.slice(0, 20).map((resource) => `- ${resource.title} (${resource.type})`).join("\n");
+  const fileContext = fileTexts
+    .slice(0, 4)
+    .map((file) => `FILE: ${file.title}\n${file.text}`)
+    .join("\n\n---\n\n");
+
+  const response = await createOpenAIResponse({
+    model: OPENAI_MODEL_SUMMARY,
+    input: `You are generating a real practice quiz from course material.
+
+Return ONLY valid JSON:
+{
+  "title": "Quiz title",
+  "description": "One sentence summary",
+  "questions": [
+    {
+      "id": "q-1",
+      "prompt": "Question text",
+      "options": ["A", "B", "C", "D"],
+      "answerIndex": 1,
+      "explanation": "Why this answer is correct"
+    }
+  ]
+}
+
+Rules:
+- Use the actual course/module/file context below.
+- Generate 5 to 8 questions.
+- Every question must have exactly 4 options.
+- Questions should test understanding, not only title recognition.
+- Explanations should reference the underlying material briefly and clearly.
+- Do not invent content that is unsupported by the provided material.
+
+Course: ${courseName}
+Module focus: ${moduleName || "Selected modules"}
+Quiz title: ${title}
+
+Resource titles:
+${resourceLines || "- No explicit resource titles provided"}
+
+File excerpts:
+${fileContext || "No file text was extracted. Use the available resource titles conservatively."}`,
+  });
+
+  const raw = extractResponseText(response) || "";
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Could not parse quiz JSON from model response");
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  const questions = Array.isArray(parsed.questions) ? parsed.questions : [];
+  if (!questions.length) {
+    throw new Error("Model returned no quiz questions");
+  }
+
+  return {
+    title: parsed.title || title,
+    description: parsed.description || `Practice quiz for ${moduleName || courseName}.`,
+    questions: questions.map((question, index) => ({
+      id: question.id || `q-${index + 1}`,
+      prompt: String(question.prompt || `Question ${index + 1}`),
+      options: Array.isArray(question.options) ? question.options.slice(0, 4).map(String) : [],
+      answerIndex: Number.isInteger(question.answerIndex) ? question.answerIndex : 0,
+      explanation: String(question.explanation || "Review the relevant module material for this concept."),
+    })).filter((question) => question.options.length === 4),
+  };
 }
 
 async function listActiveCanvasCourses(accessToken) {
@@ -2848,6 +3322,463 @@ app.post("/api/generate-lesson-audio", async (req, res) => {
 });
 
 // ── Start ──────────────────────────────────────────────────
+
+app.get("/api/courses/:courseId/syllabus", async (req, res) => {
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) return res.status(401).json({ error: "No authenticated session" });
+    const accessToken = getCanvasAccessToken(req);
+    const syllabus = await resolveCourseSyllabus(req.params.courseId, accessToken);
+    res.json({
+      courseId: syllabus.course.id,
+      courseName: syllabus.course.name,
+      syllabusHtml: syllabus.syllabusHtml,
+      syllabusText: syllabus.syllabusText,
+      source: syllabus.source,
+      hasSyllabus: Boolean(syllabus.syllabusText),
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: `Failed to fetch syllabus: ${err.message}` });
+  }
+});
+
+app.post("/api/study-plan", async (req, res) => {
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) return res.status(401).json({ error: "No authenticated session" });
+    const { courseId, preferences = {}, userId = null } = req.body || {};
+    if (!courseId) return res.status(400).json({ error: "courseId is required" });
+    const accessToken = getCanvasAccessToken(req);
+    const normalizedPreferences = normalizePlanPreferences(preferences);
+    const [syllabusData, assignments, modules] = await Promise.all([
+      resolveCourseSyllabus(courseId, accessToken),
+      canvasRequestAll(`/courses/${courseId}/assignments?per_page=50&order_by=due_at`, 10, accessToken).catch(() => []),
+      canvasRequestAll(`/courses/${courseId}/modules?per_page=100`, 10, accessToken).catch(() => []),
+    ]);
+    const scopedModules = normalizedPreferences.selectedModuleIds.length > 0
+      ? modules.filter((module) => normalizedPreferences.selectedModuleIds.includes(String(module.id)))
+      : modules;
+    const moduleResources = await getModuleResourceScope(courseId, scopedModules, accessToken);
+    const studyPlanContexts = await buildStudyPlanSourceContext(courseId, scopedModules, accessToken);
+    let plan;
+    try {
+      plan = await generateStudyPlanWithAI({
+        courseName: syllabusData.course.name,
+        preferences: normalizedPreferences,
+        scopedModules,
+        assignments,
+        syllabusText: syllabusData.syllabusText,
+        moduleContexts: studyPlanContexts,
+      });
+    } catch {
+      plan = buildFallbackStudyPlan({
+        courseName: syllabusData.course.name,
+        preferences: normalizedPreferences,
+        scopedModules,
+        assignments,
+        moduleResources,
+        syllabusText: syllabusData.syllabusText,
+      });
+    }
+
+    let autoQuizCount = 0;
+    if ((userId || context.userId) && moduleResources.length > 0) {
+      const normalizedUserId = String(userId || context.userId);
+      const store = readQuizStore();
+      const existing = Array.isArray(store.quizzesByUser?.[normalizedUserId]) ? store.quizzesByUser[normalizedUserId] : [];
+      const quizContexts = await buildQuizSourceContext(courseId, scopedModules, [], accessToken);
+      const generated = await Promise.all(quizContexts.map(async (module) => {
+        let quiz;
+        try {
+          quiz = await generateQuizWithAI({
+            title: `${module.name} Quiz`,
+            courseName: syllabusData.course.name,
+            moduleName: module.name,
+            resources: module.resources,
+            fileTexts: module.fileTexts,
+          });
+        } catch {
+          quiz = buildFallbackQuiz({
+            title: `${module.name} Quiz`,
+            courseName: syllabusData.course.name,
+            moduleName: module.name,
+            resources: module.resources,
+          });
+        }
+        return {
+          id: `${normalizedUserId}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+          userId: normalizedUserId,
+          courseId: String(courseId),
+          courseName: syllabusData.course.name,
+          scopeType: "study_plan_module",
+          moduleId: String(module.id),
+          moduleName: module.name,
+          title: quiz.title,
+          selectedModuleIds: [String(module.id)],
+          selectedFileIds: [],
+          description: quiz.description,
+          questions: quiz.questions,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          taken: false,
+          lastAttempt: null,
+        };
+      }));
+      store.quizzesByUser = store.quizzesByUser || {};
+      store.quizzesByUser[normalizedUserId] = [...generated, ...existing];
+      writeQuizStore(store);
+      autoQuizCount = generated.length;
+    }
+
+    res.json({
+      courseId: syllabusData.course.id,
+      courseName: syllabusData.course.name,
+      syllabusText: syllabusData.syllabusText,
+      syllabusSource: syllabusData.source,
+      hasSyllabus: Boolean(syllabusData.syllabusText),
+      preferences: normalizedPreferences,
+      scopedModules: scopedModules.map((module) => ({ id: module.id, name: module.name, position: module.position })),
+      plan,
+      autoQuizCount,
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: `Study plan generation failed: ${err.message}` });
+  }
+});
+
+app.get("/api/study-plans", (req, res) => {
+  const userId = String(req.query.userId || "").trim();
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+  try {
+    const store = readStudyPlanStore();
+    res.json(Array.isArray(store.plansByUser?.[userId]) ? store.plansByUser[userId] : []);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to load saved study plans: ${err.message}` });
+  }
+});
+
+app.post("/api/study-plans", (req, res) => {
+  const { userId, planName, goalName, courseId, courseName, preferences, scopedModules = [], plan, schedule = [] } = req.body || {};
+  if (!userId || !planName || !courseId || !courseName || !plan) {
+    return res.status(400).json({ error: "userId, planName, courseId, courseName, and plan are required" });
+  }
+  try {
+    const store = readStudyPlanStore();
+    const normalizedUserId = String(userId);
+    const plans = Array.isArray(store.plansByUser?.[normalizedUserId]) ? store.plansByUser[normalizedUserId] : [];
+    const now = new Date().toISOString();
+    const savedPlan = {
+      id: `${normalizedUserId}-${Date.now()}`,
+      userId: normalizedUserId,
+      planName,
+      goalName: goalName || planName,
+      courseId,
+      courseName,
+      preferences,
+      scopedModules,
+      plan,
+      schedule,
+      createdAt: now,
+      updatedAt: now,
+    };
+    store.plansByUser = store.plansByUser || {};
+    store.plansByUser[normalizedUserId] = [savedPlan, ...plans];
+    writeStudyPlanStore(store);
+    res.status(201).json(savedPlan);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to save study plan: ${err.message}` });
+  }
+});
+
+app.put("/api/study-plans/:planId", (req, res) => {
+  const planId = String(req.params.planId || "").trim();
+  const { userId, planName, goalName, courseId, courseName, preferences, scopedModules = [], plan, schedule = [] } = req.body || {};
+  if (!planId || !userId || !planName || !courseId || !courseName || !plan) {
+    return res.status(400).json({ error: "planId, userId, planName, courseId, courseName, and plan are required" });
+  }
+
+  try {
+    const store = readStudyPlanStore();
+    const normalizedUserId = String(userId);
+    const plans = Array.isArray(store.plansByUser?.[normalizedUserId]) ? store.plansByUser[normalizedUserId] : [];
+    const index = plans.findIndex((item) => item.id === planId);
+    if (index === -1) {
+      return res.status(404).json({ error: "Study plan not found" });
+    }
+
+    const existingPlan = plans[index];
+    const updatedPlan = {
+      ...existingPlan,
+      planName,
+      goalName: goalName || planName,
+      courseId,
+      courseName,
+      preferences,
+      scopedModules,
+      plan,
+      schedule,
+      updatedAt: new Date().toISOString(),
+    };
+
+    plans[index] = updatedPlan;
+    store.plansByUser[normalizedUserId] = plans;
+    writeStudyPlanStore(store);
+    res.json(updatedPlan);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to update study plan: ${err.message}` });
+  }
+});
+
+app.delete("/api/study-plans/:planId", (req, res) => {
+  const planId = String(req.params.planId || "").trim();
+  const userId = String(req.query.userId || req.body?.userId || "").trim();
+  if (!planId || !userId) {
+    return res.status(400).json({ error: "planId and userId are required" });
+  }
+
+  try {
+    const store = readStudyPlanStore();
+    const plans = Array.isArray(store.plansByUser?.[userId]) ? store.plansByUser[userId] : [];
+    const nextPlans = plans.filter((item) => item.id !== planId);
+    if (nextPlans.length === plans.length) {
+      return res.status(404).json({ error: "Study plan not found" });
+    }
+
+    store.plansByUser[userId] = nextPlans;
+    writeStudyPlanStore(store);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to delete study plan: ${err.message}` });
+  }
+});
+
+app.get("/api/quizzes", (req, res) => {
+  const userId = String(req.query.userId || "").trim();
+  if (!userId) return res.status(400).json({ error: "userId is required" });
+  try {
+    const store = readQuizStore();
+    res.json(Array.isArray(store.quizzesByUser?.[userId]) ? store.quizzesByUser[userId] : []);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to load quizzes: ${err.message}` });
+  }
+});
+
+app.post("/api/quizzes/generate", async (req, res) => {
+  try {
+    const context = getSessionContext(req);
+    if (!context.userId) return res.status(401).json({ error: "No authenticated session" });
+    const { userId, courseId, courseName, title, selectedModuleIds = [], selectedFileIds = [] } = req.body || {};
+    if (!userId || !courseId || !courseName) {
+      return res.status(400).json({ error: "userId, courseId, and courseName are required" });
+    }
+    const accessToken = getCanvasAccessToken(req);
+    const modules = await canvasRequestAll(`/courses/${courseId}/modules?per_page=100`, 10, accessToken).catch(() => []);
+    const scopedModules = Array.isArray(selectedModuleIds) && selectedModuleIds.length > 0
+      ? modules.filter((module) => selectedModuleIds.includes(String(module.id)))
+      : modules;
+    const moduleResources = await getModuleResourceScope(courseId, scopedModules, accessToken);
+    const quizContexts = await buildQuizSourceContext(courseId, scopedModules, selectedFileIds, accessToken);
+    const combinedResources = moduleResources.flatMap((module) =>
+      module.resources
+        .filter((resource) => Array.isArray(selectedFileIds) && selectedFileIds.length > 0 ? selectedFileIds.includes(String(resource.id)) : true)
+        .map((resource) => ({ ...resource, title: `${module.name}: ${resource.title}` }))
+    );
+    const combinedFileTexts = quizContexts.flatMap((module) =>
+      (module.fileTexts || []).map((file) => ({
+        ...file,
+        title: `${module.name}: ${file.title}`,
+      }))
+    );
+    let quiz;
+    try {
+      quiz = await generateQuizWithAI({
+        title: title || `${courseName} Custom Quiz`,
+        courseName,
+        moduleName: scopedModules.length === 1 ? scopedModules[0].name : null,
+        resources: combinedResources,
+        fileTexts: combinedFileTexts,
+      });
+    } catch {
+      quiz = buildFallbackQuiz({
+        title: title || `${courseName} Custom Quiz`,
+        courseName,
+        moduleName: scopedModules.length === 1 ? scopedModules[0].name : null,
+        resources: combinedResources,
+      });
+    }
+    const normalizedUserId = String(userId);
+    const store = readQuizStore();
+    const existing = Array.isArray(store.quizzesByUser?.[normalizedUserId]) ? store.quizzesByUser[normalizedUserId] : [];
+    const savedQuiz = {
+      id: `${normalizedUserId}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}`,
+      userId: normalizedUserId,
+      courseId: String(courseId),
+      courseName,
+      scopeType: "manual",
+      moduleId: null,
+      moduleName: null,
+      title: quiz.title,
+      selectedModuleIds: Array.isArray(selectedModuleIds) ? selectedModuleIds.map(String) : [],
+      selectedFileIds: Array.isArray(selectedFileIds) ? selectedFileIds.map(String) : [],
+      description: quiz.description,
+      questions: quiz.questions,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      taken: false,
+      lastAttempt: null,
+    };
+    store.quizzesByUser = store.quizzesByUser || {};
+    store.quizzesByUser[normalizedUserId] = [savedQuiz, ...existing];
+    writeQuizStore(store);
+    res.status(201).json([savedQuiz]);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: `Quiz generation failed: ${err.message}` });
+  }
+});
+
+app.put("/api/quizzes/:quizId", async (req, res) => {
+  try {
+    const quizId = String(req.params.quizId || "").trim();
+    const { userId, courseId, courseName, title, selectedModuleIds = [], selectedFileIds = [] } = req.body || {};
+    if (!quizId || !userId || !courseId || !courseName || !title) {
+      return res.status(400).json({ error: "quizId, userId, courseId, courseName, and title are required" });
+    }
+
+    const store = readQuizStore();
+    const normalizedUserId = String(userId);
+    const quizzes = Array.isArray(store.quizzesByUser?.[normalizedUserId]) ? store.quizzesByUser[normalizedUserId] : [];
+    const index = quizzes.findIndex((quiz) => quiz.id === quizId);
+    if (index === -1) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    const accessToken = getCanvasAccessToken(req);
+    const modules = await canvasRequestAll(`/courses/${courseId}/modules?per_page=100`, 10, accessToken).catch(() => []);
+    const scopedModules = Array.isArray(selectedModuleIds) && selectedModuleIds.length > 0
+      ? modules.filter((module) => selectedModuleIds.includes(String(module.id)))
+      : modules;
+    const moduleResources = await getModuleResourceScope(courseId, scopedModules, accessToken);
+    const quizContexts = await buildQuizSourceContext(courseId, scopedModules, selectedFileIds, accessToken);
+    const combinedResources = moduleResources.flatMap((module) =>
+      module.resources
+        .filter((resource) => Array.isArray(selectedFileIds) && selectedFileIds.length > 0 ? selectedFileIds.includes(String(resource.id)) : true)
+        .map((resource) => ({ ...resource, title: `${module.name}: ${resource.title}` }))
+    );
+    const combinedFileTexts = quizContexts.flatMap((module) =>
+      (module.fileTexts || []).map((file) => ({
+        ...file,
+        title: `${module.name}: ${file.title}`,
+      }))
+    );
+
+    let quiz;
+    try {
+      quiz = await generateQuizWithAI({
+        title,
+        courseName,
+        moduleName: scopedModules.length === 1 ? scopedModules[0].name : null,
+        resources: combinedResources,
+        fileTexts: combinedFileTexts,
+      });
+    } catch {
+      quiz = buildFallbackQuiz({
+        title,
+        courseName,
+        moduleName: scopedModules.length === 1 ? scopedModules[0].name : null,
+        resources: combinedResources,
+      });
+    }
+
+    const existingQuiz = quizzes[index];
+    const updatedQuiz = {
+      ...existingQuiz,
+      courseId: String(courseId),
+      courseName,
+      title: quiz.title,
+      description: quiz.description,
+      selectedModuleIds: Array.isArray(selectedModuleIds) ? selectedModuleIds.map(String) : [],
+      selectedFileIds: Array.isArray(selectedFileIds) ? selectedFileIds.map(String) : [],
+      questions: quiz.questions,
+      updatedAt: new Date().toISOString(),
+      taken: false,
+      lastAttempt: null,
+    };
+
+    quizzes[index] = updatedQuiz;
+    store.quizzesByUser[normalizedUserId] = quizzes;
+    writeQuizStore(store);
+    res.json(updatedQuiz);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: `Quiz update failed: ${err.message}` });
+  }
+});
+
+app.put("/api/quizzes/:quizId/submit", (req, res) => {
+  const quizId = String(req.params.quizId || "").trim();
+  const { userId, answers = [] } = req.body || {};
+  if (!quizId || !userId) return res.status(400).json({ error: "quizId and userId are required" });
+  try {
+    const store = readQuizStore();
+    const normalizedUserId = String(userId);
+    const quizzes = Array.isArray(store.quizzesByUser?.[normalizedUserId]) ? store.quizzesByUser[normalizedUserId] : [];
+    const index = quizzes.findIndex((quiz) => quiz.id === quizId);
+    if (index === -1) return res.status(404).json({ error: "Quiz not found" });
+    const quiz = quizzes[index];
+    const answerMap = new Map(Array.isArray(answers) ? answers.map((answer) => [String(answer.questionId), Number(answer.answerIndex)]) : []);
+    const gradedAnswers = (quiz.questions || []).map((question) => {
+      const selectedIndex = answerMap.has(String(question.id)) ? answerMap.get(String(question.id)) : null;
+      return {
+        questionId: question.id,
+        selectedIndex,
+        correctIndex: question.answerIndex,
+        isCorrect: selectedIndex === question.answerIndex,
+      };
+    });
+    const correctCount = gradedAnswers.filter((answer) => answer.isCorrect).length;
+    const totalQuestions = gradedAnswers.length || 1;
+    const updatedQuiz = {
+      ...quiz,
+      taken: true,
+      updatedAt: new Date().toISOString(),
+      lastAttempt: {
+        takenAt: new Date().toISOString(),
+        answers: gradedAnswers,
+        score: Math.round((correctCount / totalQuestions) * 100),
+        correctCount,
+        totalQuestions: gradedAnswers.length,
+      },
+    };
+    quizzes[index] = updatedQuiz;
+    store.quizzesByUser[normalizedUserId] = quizzes;
+    writeQuizStore(store);
+    res.json(updatedQuiz);
+  } catch (err) {
+    res.status(500).json({ error: `Quiz submission failed: ${err.message}` });
+  }
+});
+
+app.delete("/api/quizzes/:quizId", (req, res) => {
+  const quizId = String(req.params.quizId || "").trim();
+  const userId = String(req.query.userId || req.body?.userId || "").trim();
+  if (!quizId || !userId) {
+    return res.status(400).json({ error: "quizId and userId are required" });
+  }
+
+  try {
+    const store = readQuizStore();
+    const quizzes = Array.isArray(store.quizzesByUser?.[userId]) ? store.quizzesByUser[userId] : [];
+    const nextQuizzes = quizzes.filter((item) => item.id !== quizId);
+    if (nextQuizzes.length === quizzes.length) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    store.quizzesByUser[userId] = nextQuizzes;
+    writeQuizStore(store);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: `Failed to delete quiz: ${err.message}` });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Backend running → http://localhost:${PORT}`);

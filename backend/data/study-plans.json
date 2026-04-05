@@ -1,0 +1,212 @@
+{
+  "plansByUser": {
+    "1142825": [
+      {
+        "id": "1142825-1775364409999",
+        "userId": "1142825",
+        "planName": "Stay on track in IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "goalName": "Stay on track in IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "courseId": 205911,
+        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "preferences": {
+          "startDate": "2026-04-05",
+          "endDate": "2026-04-19",
+          "objective": "Stay on track in IFT 530: Adv DB Management Systems (2025 Spring C)",
+          "hoursPerWeek": 8,
+          "sessionMinutes": 60,
+          "pace": "balanced",
+          "includeAssignments": true,
+          "focusDays": [
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu",
+            "Fri"
+          ],
+          "priorities": [],
+          "selectedModuleIds": [
+            "2313510"
+          ]
+        },
+        "scopedModules": [
+          {
+            "id": 2313510,
+            "name": "Module 3: Populating Tables",
+            "position": 5
+          }
+        ],
+        "plan": {
+          "overview": "This study plan focuses on mastering the Module 3 content on populating tables using SQL Server. It aims to build strong skills in writing T-SQL to insert, update, and delete data effectively.",
+          "recommendations": [
+            "Review the provided sample code carefully and practice replicating queries each study day.",
+            "Spend time experimenting with different data types and constraints to understand table population nuances."
+          ],
+          "weeklyPlan": [
+            {
+              "day": "Week 1",
+              "focus": "Understand core concepts and syntax for populating tables",
+              "tasks": [
+                "Read all learning materials on populating tables",
+                "Study the sample code examples in detail",
+                "Practice simple INSERT statements"
+              ]
+            },
+            {
+              "day": "Week 2",
+              "focus": "Practice advanced table population techniques",
+              "tasks": [
+                "Work on UPDATE, DELETE and transaction control statements",
+                "Create scripts simulating real-world scenarios of data population",
+                "Review errors and troubleshoot sample code issues"
+              ]
+            }
+          ],
+          "milestones": [
+            {
+              "title": "Submit Assignment: Populating Tables",
+              "dueDate": "2025-02-03T06:59:00Z",
+              "reason": "Demonstrates your ability to effectively populate tables using T-SQL commands"
+            },
+            {
+              "title": "Completion of Module 3 Quiz",
+              "dueDate": "2025-02-03T06:59:00Z",
+              "reason": "Tests understanding of concepts and syntax learned in Module 3"
+            }
+          ],
+          "customTips": [
+            "Schedule focused 60-minute study blocks on weekdays to maximize retention.",
+            "Use a SQL Server environment to test queries immediately after learning them."
+          ]
+        },
+        "schedule": [
+          {
+            "day": "Week 1",
+            "focus": "Understand core concepts and syntax for populating tables",
+            "tasks": [
+              "Read all learning materials on populating tables",
+              "Study the sample code examples in detail",
+              "Practice simple INSERT statements"
+            ]
+          },
+          {
+            "day": "Week 2",
+            "focus": "Practice advanced table population techniques",
+            "tasks": [
+              "Work on UPDATE, DELETE and transaction control statements",
+              "Create scripts simulating real-world scenarios of data population",
+              "Review errors and troubleshoot sample code issues"
+            ]
+          }
+        ],
+        "createdAt": "2026-04-05T04:46:49.999Z",
+        "updatedAt": "2026-04-05T04:46:49.999Z"
+      },
+      {
+        "id": "1142825-1775363448748",
+        "userId": "1142825",
+        "planName": "Stay on track in CSE 512: Distributed Database Systems (2025 Fall C)",
+        "goalName": "Stay on track in CSE 512: Distributed Database Systems (2025 Fall C)",
+        "courseId": 231656,
+        "courseName": "CSE 512: Distributed Database Systems (2025 Fall C)",
+        "preferences": {
+          "startDate": "2026-04-05",
+          "endDate": "2026-04-19",
+          "objective": "Stay on track in CSE 512: Distributed Database Systems (2025 Fall C)",
+          "hoursPerWeek": 8,
+          "sessionMinutes": 15,
+          "pace": "balanced",
+          "includeAssignments": true,
+          "focusDays": [
+            "Mon",
+            "Tue",
+            "Wed",
+            "Thu",
+            "Fri"
+          ],
+          "priorities": [],
+          "selectedModuleIds": [
+            "2641729",
+            "2641764"
+          ]
+        },
+        "scopedModules": [
+          {
+            "id": 2641729,
+            "name": "W01 - 8/21",
+            "position": 1
+          },
+          {
+            "id": 2641764,
+            "name": "W08 - 10/15",
+            "position": 8
+          }
+        ],
+        "plan": {
+          "overview": "Course Description: Distributed Database Systems (DDS) is a 3-credit course that offers a comprehensive exploration of managing data across interconnected databases. Includes topics such as distributed database architecture, design, parallel query processing and optimization, transaction management, concurrency control, deadlocks, and fault-tolerant mechanisms. Additionally, the course may explore modern database management in cloud computing environments, Map/Reduce-based systems, and distributed NoSQL database systems such as Apache Cassandra/MongoDB/Apache HBase/Couchbase. The course emphasizes interactive learning through in-class discussions, requiring students to come prepared after doing the necessary readings. Practical assignments/exercises and projects complement theoretical knowledge, enabling students to develop expertise in designing and managing distributed databases. By the course's end, students gain valuable skills applicable to data management, cloud computing, and related fields, equipped to tackle challenges in large-scale distributed data systems. Course Session: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Days: Wednesday &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Time: 4:30 PM – 7:15 PM &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Location: Tempe – PSH150 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Dates: 8/21/2025 – 12/05/2025 Instructor: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name: Bharatesh Chakravarthi, Ph.D. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;Assistant Teaching Professor, CSE, SCAI &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Office: BYENG M140 / Zoom Personal Meeting Room &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Email: bharatesh@asu.edu Office Hours: Thursday 4:30 – 5:30 PM ; Students can meet the instructor outside of office hours by scheduling an appointment via email. Include [ CSE512 ] at the start of the subject’s line. Teaching Assistant: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Name: Kaustav Chanda &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Email: kchanda3@asu.edu &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Office Hours: Monday and Wednesday 3:30 - 4:30 PM &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Location: BYENG 201 / https://asu.zoom.us/j/6359151744 Grader:&nbsp; Joseph Raj Vishal Syllabus: [Fall 2025] CSE 512 Distributed Database Systems.pdf Course Plan: It is strongly recommended that students regularly visit the Canvas course page for any updates or modifications concerning assignments, In-class activities, quizzes, and group project schedules, as well as submission deadlines. The topics listed below are for reference purposes and are subject to change. &nbsp;",
+          "recommendations": [
+            "Study about 8 hours per week in 15-minute sessions.",
+            "Focus on these modules: W01 - 8/21, W08 - 10/15."
+          ],
+          "weeklyPlan": [
+            {
+              "day": "Week 1",
+              "focus": "W01 - 8/21: review the most important ideas and examples.",
+              "tasks": [
+                "Review W01 - 8/21 and capture the main concepts.",
+                "Study DDS W01 (27th Aug).pdf.",
+                "Write 3 to 5 quick recall questions."
+              ]
+            },
+            {
+              "day": "Week 2",
+              "focus": "W08 - 10/15: review the most important ideas and examples.",
+              "tasks": [
+                "Review W08 - 10/15 and capture the main concepts.",
+                "Study Elastic Search - Hands On.",
+                "Write 3 to 5 quick recall questions."
+              ]
+            }
+          ],
+          "milestones": [
+            {
+              "title": "W01 - 8/21",
+              "dueDate": "2025-09-03T06:59:59Z",
+              "reason": "Reach this checkpoint before HW 01."
+            },
+            {
+              "title": "W08 - 10/15",
+              "dueDate": "2025-09-11T06:59:59Z",
+              "reason": "Reach this checkpoint before HW 03."
+            }
+          ],
+          "customTips": [
+            "Use one session per week for self-testing.",
+            "Rebuild the plan if the module scope changes."
+          ]
+        },
+        "schedule": [
+          {
+            "day": "Week 1",
+            "focus": "W01 - 8/21: review the most important ideas and examples.",
+            "tasks": [
+              "Review W01 - 8/21 and capture the main concepts.",
+              "Study DDS W01 (27th Aug).pdf.",
+              "Write 3 to 5 quick recall questions."
+            ]
+          },
+          {
+            "day": "Week 2",
+            "focus": "W08 - 10/15: review the most important ideas and examples.",
+            "tasks": [
+              "Review W08 - 10/15 and capture the main concepts.",
+              "Study Elastic Search - Hands On.",
+              "Write 3 to 5 quick recall questions."
+            ]
+          }
+        ],
+        "createdAt": "2026-04-05T04:30:48.748Z",
+        "updatedAt": "2026-04-05T04:30:48.748Z"
+      }
+    ]
+  }
+}

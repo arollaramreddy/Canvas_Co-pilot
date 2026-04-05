@@ -1,0 +1,11 @@
+{
+  "id": "study-plan",
+  "label": "Study Plan",
+  "defaults": {
+    "hoursPerWeek": 8,
+    "sessionMinutes": 60,
+    "pace": "balanced",
+    "includeAssignments": true,
+    "focusDays": ["Mon", "Tue", "Wed", "Thu", "Fri"]
+  }
+}

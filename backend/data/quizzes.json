@@ -1,0 +1,408 @@
+{
+  "quizzesByUser": {
+    "1142825": [
+      {
+        "id": "1142825-1775365976905-58a0c7",
+        "userId": "1142825",
+        "courseId": "205911",
+        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "scopeType": "manual",
+        "moduleId": null,
+        "moduleName": null,
+        "title": "IFT 530: Adv DB Management Systems (2025 Spring C) Custom Quiz",
+        "selectedModuleIds": [
+          "2313511",
+          "2313516"
+        ],
+        "selectedFileIds": [],
+        "description": "Assess understanding of SQL queries, views, and triggers from selected modules.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "What is the primary purpose of a SQL view in database management?",
+            "options": [
+              "To store data physically in a new table",
+              "To provide a virtual table that encapsulates a query",
+              "To enforce referential integrity between tables",
+              "To trigger automatic actions after data modification"
+            ],
+            "answerIndex": 1,
+            "explanation": "Views act as virtual tables that encapsulate query results without storing the data physically, simplifying data access as discussed in Module 4 Queries and Views."
+          },
+          {
+            "id": "q-2",
+            "prompt": "Which type of SQL query would most likely be used to define a view?",
+            "options": [
+              "SELECT query",
+              "INSERT query",
+              "UPDATE query",
+              "DELETE query"
+            ],
+            "answerIndex": 0,
+            "explanation": "A view is defined using a SELECT query that specifies the virtual table's contents, as shown in the learning materials on Queries and Views in Module 4."
+          },
+          {
+            "id": "q-3",
+            "prompt": "How do triggers differ from standard SQL queries?",
+            "options": [
+              "Triggers store results in new tables automatically",
+              "Triggers execute automatically in response to data changes",
+              "Triggers are only used for creating views",
+              "Triggers cannot modify data"
+            ],
+            "answerIndex": 1,
+            "explanation": "Triggers automatically execute predefined actions in response to data changes, like INSERT, UPDATE, or DELETE events, as outlined in Module 9 on Triggers."
+          },
+          {
+            "id": "q-4",
+            "prompt": "Which of the following is a valid use case for database triggers based on Module 9 materials?",
+            "options": [
+              "Materializing a view for faster querying",
+              "Automatically validating and enforcing complex business rules during data updates",
+              "Creating backups of the database regularly",
+              "Executing ad-hoc SELECT queries on demand"
+            ],
+            "answerIndex": 1,
+            "explanation": "Triggers are used to enforce complex business rules automatically during data modifications, as described in the Triggers module."
+          },
+          {
+            "id": "q-5",
+            "prompt": "In the context of SQL views, which statement is true regarding updates?",
+            "options": [
+              "All views are inherently updatable without restrictions",
+              "Views that involve joins are always updatable",
+              "Some views can be updated if the DBMS supports it and certain conditions are met",
+              "Views can never be used to update underlying tables"
+            ],
+            "answerIndex": 2,
+            "explanation": "While many views are read-only, some views can be updatable if conditions such as a single base table and key preservation are met, as indicated in the Queries and Views materials."
+          },
+          {
+            "id": "q-6",
+            "prompt": "When defining a trigger, what events typically cause a trigger to fire as per the Module 9 overview?",
+            "options": [
+              "Query compilation only",
+              "Data definition changes like ALTER TABLE only",
+              "Data modification events like INSERT, UPDATE, or DELETE",
+              "User login and logout events"
+            ],
+            "answerIndex": 2,
+            "explanation": "Triggers are configured to fire automatically on data modification events such as INSERT, UPDATE, or DELETE operations, according to the triggers overview in Module 9."
+          }
+        ],
+        "createdAt": "2026-04-05T05:12:56.905Z",
+        "updatedAt": "2026-04-05T05:13:21.504Z",
+        "taken": true,
+        "lastAttempt": {
+          "takenAt": "2026-04-05T05:13:21.504Z",
+          "answers": [
+            {
+              "questionId": "q-1",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-2",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-3",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-4",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-5",
+              "selectedIndex": null,
+              "correctIndex": 2,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-6",
+              "selectedIndex": null,
+              "correctIndex": 2,
+              "isCorrect": false
+            }
+          ],
+          "score": 0,
+          "correctCount": 0,
+          "totalQuestions": 6
+        }
+      },
+      {
+        "id": "1142825-1775364381098-a62b85",
+        "userId": "1142825",
+        "courseId": "205911",
+        "courseName": "IFT 530: Adv DB Management Systems (2025 Spring C)",
+        "scopeType": "study_plan_module",
+        "moduleId": "2313510",
+        "moduleName": "Module 3: Populating Tables",
+        "title": "Module 3: Populating Tables Quiz",
+        "selectedModuleIds": [
+          "2313510"
+        ],
+        "selectedFileIds": [],
+        "description": "Assess understanding of methods and best practices for populating tables in advanced database systems.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "Which SQL statement is primarily used to insert a single row of data into a database table?",
+            "options": [
+              "UPDATE",
+              "INSERT INTO",
+              "SELECT",
+              "DELETE"
+            ],
+            "answerIndex": 1,
+            "explanation": "The INSERT INTO statement is used to add one or more rows of data to a table, as covered in the Populating Tables assignment and sample code."
+          },
+          {
+            "id": "q-2",
+            "prompt": "When inserting multiple rows in one SQL statement, what is the correct syntax to separate each row's data?",
+            "options": [
+              "Use commas between each row enclosed in parentheses",
+              "Use semicolons between values",
+              "Use 'AND' between each row",
+              "Place each row on a new line without punctuation"
+            ],
+            "answerIndex": 0,
+            "explanation": "Multiple rows can be inserted by listing each row's values in parentheses separated by commas, as demonstrated in the sample code for populating tables."
+          },
+          {
+            "id": "q-3",
+            "prompt": "Which practice is recommended when populating tables to ensure data integrity during bulk insert operations?",
+            "options": [
+              "Disable all constraints before inserting",
+              "Use transactions to group insert statements",
+              "Insert data without defining column names",
+              "Skip committing changes to improve speed"
+            ],
+            "answerIndex": 1,
+            "explanation": "Using transactions allows grouping inserts to ensure atomicity and consistency, a best practice highlighted in the assignment discussions."
+          },
+          {
+            "id": "q-4",
+            "prompt": "In the context of the module, what advantage does using sample code for populating tables offer?",
+            "options": [
+              "It eliminates the need for schema design",
+              "It provides templates to correctly format insert statements",
+              "It automatically optimizes database indexes",
+              "It generates random data without validation"
+            ],
+            "answerIndex": 1,
+            "explanation": "Sample code offers templates that help students format their insert statements correctly, supporting understanding of the syntax and approach."
+          },
+          {
+            "id": "q-5",
+            "prompt": "What is the effect of omitting the column list in an INSERT INTO statement while populating tables?",
+            "options": [
+              "The database automatically matches columns by name",
+              "The statement will fail unless all columns have default values",
+              "The data is ignored and not inserted",
+              "All columns must be provided values in the order defined by the table schema"
+            ],
+            "answerIndex": 3,
+            "explanation": "If the column list is omitted, values must be provided for all columns in the defined schema order, as explained in the sample code and assignment instructions."
+          },
+          {
+            "id": "q-6",
+            "prompt": "Which of the following is a key consideration when using scripts to populate tables as part of the assignment?",
+            "options": [
+              "Scripts guarantee uniqueness across all database instances automatically",
+              "Scripts must handle potential errors and rollbacks appropriately",
+              "Scripts do not require careful data type matching",
+              "Scripts replace the need for database normalization"
+            ],
+            "answerIndex": 1,
+            "explanation": "Proper error handling and rollback are important to maintain database integrity during insert operations, as emphasized in the assignment guidance."
+          }
+        ],
+        "createdAt": "2026-04-05T04:46:21.098Z",
+        "updatedAt": "2026-04-05T04:46:21.098Z",
+        "taken": false,
+        "lastAttempt": null
+      },
+      {
+        "id": "1142825-1775364153163-404374",
+        "userId": "1142825",
+        "courseId": "231656",
+        "courseName": "CSE 512: Distributed Database Systems (2025 Fall C)",
+        "scopeType": "manual",
+        "moduleId": null,
+        "moduleName": null,
+        "title": "CSE 512: Distributed Database Systems (2025 Fall C) Custom Quiz",
+        "selectedModuleIds": [
+          "2641730"
+        ],
+        "selectedFileIds": [],
+        "description": "Quiz covering fragmentation, partitioning, and TPC-H dataset usage in PostgreSQL.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "What is the primary motivation for using fragmentation and partitioning in large databases such as those modeled by the TPC-H benchmark?",
+            "options": [
+              "To reduce database size by deleting old records",
+              "To improve performance by reducing query scan times and managing backups efficiently",
+              "To simplify schema design by merging tables",
+              "To ensure ACID compliance in distributed transactions"
+            ],
+            "answerIndex": 1,
+            "explanation": "Fragmentation and partitioning help scale large databases by reducing query runtime scanning millions of rows and making backup and indexing operations more manageable, as emphasized in the DDS CS02.pdf notes on TPC-H."
+          },
+          {
+            "id": "q-2",
+            "prompt": "In the TPC-H benchmark implemented on PostgreSQL, which two tables typically grow very large and thus benefit most from fragmentation or partitioning?",
+            "options": [
+              "Customer and Supplier",
+              "Nation and Region",
+              "Lineitem and Orders",
+              "Part and Partsupp"
+            ],
+            "answerIndex": 2,
+            "explanation": "The Lineitem and Orders tables are noted as large and ideal for performance demonstrations, motivating fragmentation/partitioning to handle scale effectively."
+          },
+          {
+            "id": "q-3",
+            "prompt": "Which type of fragmentation involves dividing a table by selecting subsets of rows based on predicates, as discussed in the context of TPC-H fragmentation?",
+            "options": [
+              "Horizontal fragmentation",
+              "Vertical fragmentation",
+              "Hybrid fragmentation",
+              "Hash fragmentation"
+            ],
+            "answerIndex": 0,
+            "explanation": "Horizontal fragmentation divides a table into subsets of rows by predicates, a method detailed in the DDS CS02.pdf slides under fragmentation alternatives."
+          },
+          {
+            "id": "q-4",
+            "prompt": "In PostgreSQL, what partitioning method is most similar to the fragmentation techniques studied in distributed database systems, particularly when applied to the TPC-H dataset?",
+            "options": [
+              "Vertical partitioning using column-store tables",
+              "PostgreSQL table partitioning, such as range, list, and hash partitioning",
+              "Using foreign data wrappers",
+              "Materialized views"
+            ],
+            "answerIndex": 1,
+            "explanation": "PostgreSQL table partitioning methods (range, list, hash) implement fragmentation-like data division, helping simulate distributed fragmentation as covered in the DDS CS02.pdf slides."
+          },
+          {
+            "id": "q-5",
+            "prompt": "Why is the PostgreSQL command ANALYZE recommended after bulk loading the TPC-H data before running queries?",
+            "options": [
+              "To create indexes on all tables automatically",
+              "To clean and sanitize the data imported from CSV files",
+              "To build and refresh optimizer statistics for more efficient query planning",
+              "To reorganize tables physically on disk for faster access"
+            ],
+            "answerIndex": 2,
+            "explanation": "ANALYZE updates PostgreSQL's internal statistics that help the query planner pick efficient execution plans, essential for fair baseline timings and query performance as described in TPC_H_Data_into_PgAdmin+Queries+Solution.pdf."
+          },
+          {
+            "id": "q-6",
+            "prompt": "In the SQL examples using the TPC-H dataset, what is the difference between JOIN and NATURAL JOIN?",
+            "options": [
+              "JOIN combines tables only if they have no common columns; NATURAL JOIN always causes a cross product",
+              "JOIN requires explicitly specifying join columns; NATURAL JOIN automatically joins on all common column names",
+              "JOIN is deprecated and replaced by NATURAL JOIN in SQL standards",
+              "JOIN filters rows based on conditions; NATURAL JOIN does not filter rows"
+            ],
+            "answerIndex": 1,
+            "explanation": "A JOIN requires specifying join conditions, while NATURAL JOIN automatically matches and joins using all columns with the same names, as explained in the pgAdmin TPC-H SQL queries document."
+          },
+          {
+            "id": "q-7",
+            "prompt": "What does the EXCEPT operator do in a query on the TPC-H dataset?",
+            "options": [
+              "Combines two result sets and removes duplicates",
+              "Finds common rows between two result sets",
+              "Returns all rows from the first query that do not appear in the second query",
+              "Sorts the results of a query in ascending order"
+            ],
+            "answerIndex": 2,
+            "explanation": "EXCEPT returns the difference between two result sets, selecting rows present in the first query that are absent in the second, as demonstrated in the TPC-H SQL excerpt."
+          },
+          {
+            "id": "q-8",
+            "prompt": "In TPC-H query optimization on PostgreSQL, why might increasing the session work memory (work_mem) setting be beneficial?",
+            "options": [
+              "It reduces the amount of memory available for connections",
+              "It forces queries to use indexes instead of table scans",
+              "It helps avoid temporary disk spills during large GROUP BYs, ORDER BYs, and hash joins, improving timing consistency",
+              "It disables query parallelism to simplify debugging"
+            ],
+            "answerIndex": 2,
+            "explanation": "Setting a higher work_mem helps PostgreSQL keep more intermediate data in memory during resource-intensive operations, preventing slower disk spills and making query timings more consistent as recommended in the TPC_H Data document."
+          }
+        ],
+        "createdAt": "2026-04-05T04:42:33.173Z",
+        "updatedAt": "2026-04-05T04:43:02.624Z",
+        "taken": true,
+        "lastAttempt": {
+          "takenAt": "2026-04-05T04:43:02.624Z",
+          "answers": [
+            {
+              "questionId": "q-1",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-2",
+              "selectedIndex": null,
+              "correctIndex": 2,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-3",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-4",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-5",
+              "selectedIndex": null,
+              "correctIndex": 2,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-6",
+              "selectedIndex": null,
+              "correctIndex": 1,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-7",
+              "selectedIndex": null,
+              "correctIndex": 2,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-8",
+              "selectedIndex": null,
+              "correctIndex": 2,
+              "isCorrect": false
+            }
+          ],
+          "score": 0,
+          "correctCount": 0,
+          "totalQuestions": 8
+        }
+      }
+    ]
+  }
+}

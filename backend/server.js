@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const pdf = require("pdf-parse");
 const Anthropic = require("@anthropic-ai/sdk").default;
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -14,6 +16,9 @@ const CANVAS_TOKEN = process.env.CANVAS_TOKEN;
 const CANVAS_BASE_URL = normalizeCanvasBaseUrl(
   process.env.CANVAS_BASE_URL || "https://canvas.asu.edu/api/v1"
 );
+const DATA_DIR = path.join(__dirname, "data");
+const STUDY_PLAN_STORE = path.join(DATA_DIR, "study-plans.json");
+const QUIZ_STORE = path.join(DATA_DIR, "quizzes.json");
 
 function normalizeCanvasBaseUrl(baseUrl) {
   const trimmed = (baseUrl || "").trim().replace(/\/+$/, "");
@@ -34,6 +39,56 @@ function getAnthropic() {
     anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   }
   return anthropic;
+}
+
+function ensureStudyPlanStore() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(STUDY_PLAN_STORE)) {
+    fs.writeFileSync(STUDY_PLAN_STORE, JSON.stringify({ plansByUser: {} }, null, 2));
+  }
+}
+
+function readStudyPlanStore() {
+  ensureStudyPlanStore();
+  try {
+    const raw = fs.readFileSync(STUDY_PLAN_STORE, "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : { plansByUser: {} };
+  } catch {
+    return { plansByUser: {} };
+  }
+}
+
+function writeStudyPlanStore(store) {
+  ensureStudyPlanStore();
+  fs.writeFileSync(STUDY_PLAN_STORE, JSON.stringify(store, null, 2));
+}
+
+function ensureQuizStore() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(QUIZ_STORE)) {
+    fs.writeFileSync(QUIZ_STORE, JSON.stringify({ quizzesByUser: {} }, null, 2));
+  }
+}
+
+function readQuizStore() {
+  ensureQuizStore();
+  try {
+    const raw = fs.readFileSync(QUIZ_STORE, "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : { quizzesByUser: {} };
+  } catch {
+    return { quizzesByUser: {} };
+  }
+}
+
+function writeQuizStore(store) {
+  ensureQuizStore();
+  fs.writeFileSync(QUIZ_STORE, JSON.stringify(store, null, 2));
 }
 
 // ── Canvas API helpers ────────────────────────────────────
@@ -214,22 +269,303 @@ function enumerateWeeklyRanges(startDate, endDate) {
   return ranges.length > 0 ? ranges : [{ label: "Week 1", startDate, endDate }];
 }
 
+async function getStudyPlanModuleResources(courseId, scopedModules = []) {
+  const resources = await Promise.all(
+    scopedModules.map(async (module) => {
+      try {
+        const items = await canvasRequestAll(
+          `/courses/${courseId}/modules/${module.id}/items?per_page=100`
+        );
+        const learningItems = items
+          .filter((item) => ["File", "ExternalUrl", "Page", "Assignment"].includes(item.type))
+          .slice(0, 6)
+          .map((item) => ({
+            type: item.type,
+            title: item.title || item.page_url || item.external_url || "Untitled resource",
+          }));
+
+        return {
+          id: module.id,
+          name: module.name,
+          resources: learningItems,
+        };
+      } catch {
+        return {
+          id: module.id,
+          name: module.name,
+          resources: [],
+        };
+      }
+    })
+  );
+
+  return resources;
+}
+
+async function extractPdfTextForQuiz(courseId, fileId) {
+  const cached = textCache.get(String(fileId));
+  if (cached) return cached;
+
+  const file = await canvasRequest(`/courses/${courseId}/files/${fileId}`);
+  if (!file.url) return "";
+
+  const isPdf =
+    (file.content_type || "").includes("pdf") ||
+    (file.filename || "").toLowerCase().endsWith(".pdf");
+
+  if (!isPdf) return "";
+
+  try {
+    const buffer = await downloadCanvasFile(file.url);
+    const pdfData = await pdf(buffer);
+    const text = pdfData.text || "";
+    if (text) {
+      textCache.set(String(fileId), text);
+    }
+    return text;
+  } catch {
+    return "";
+  }
+}
+
+async function collectQuizScope(courseId, modules, selectedFileIds = []) {
+  const moduleScopes = await Promise.all(
+    modules.map(async (module) => {
+      const items = await canvasRequestAll(
+        `/courses/${courseId}/modules/${module.id}/items?per_page=100`
+      );
+      const files = [];
+      const resources = [];
+
+      for (const item of items) {
+        if (!["File", "ExternalUrl", "Page", "Assignment"].includes(item.type)) continue;
+        const title = item.title || item.page_url || item.external_url || "Untitled resource";
+        resources.push({ type: item.type, title });
+
+        if (item.type === "File" && item.content_id) {
+          const fileId = String(item.content_id);
+          if (selectedFileIds.length > 0 && !selectedFileIds.includes(fileId)) continue;
+          const text = await extractPdfTextForQuiz(courseId, fileId);
+          files.push({
+            id: fileId,
+            title,
+            text: text.slice(0, 12000),
+          });
+        }
+      }
+
+      return {
+        id: module.id,
+        name: module.name,
+        resources,
+        files,
+      };
+    })
+  );
+
+  return moduleScopes;
+}
+
+function buildFallbackQuiz({ title, courseName, moduleName, resources = [] }) {
+  const resourceTitles = resources.map((resource) => resource.title).filter(Boolean);
+  const topicLabel = moduleName || courseName;
+  const seedTopics = resourceTitles.length > 0
+    ? resourceTitles.slice(0, 6)
+    : [topicLabel, `Core concepts in ${topicLabel}`, `Practice review for ${topicLabel}`];
+
+  return {
+    title,
+    description: `Practice quiz for ${topicLabel}.`,
+    questions: seedTopics.slice(0, 6).map((topic, index) => ({
+      id: `q-${index + 1}`,
+      prompt: `Which statement best matches the topic "${topic}"?`,
+      options: [
+        `It is a key concept from ${topicLabel}.`,
+        `It is unrelated to the selected study material.`,
+        `It only matters outside this course.`,
+        `It should be skipped during review.`,
+      ],
+      answerIndex: 0,
+      explanation: `"${topic}" is part of the selected material and should be reviewed.`,
+    })),
+  };
+}
+
+async function generateQuizWithAI({
+  title,
+  courseName,
+  moduleName,
+  resources = [],
+  fileTexts = [],
+}) {
+  let ai = null;
+  try {
+    ai = getAnthropic();
+  } catch {
+    return buildFallbackQuiz({ title, courseName, moduleName, resources });
+  }
+
+  const resourceSummary = resources.map((resource) => resource.title).slice(0, 8);
+  const contentSummary = fileTexts
+    .filter((file) => file.text)
+    .map((file) => `--- ${file.title} ---\n${file.text}`)
+    .join("\n\n")
+    .slice(0, 20000);
+
+  const message = await ai.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 2200,
+    messages: [{
+      role: "user",
+      content: `Create a student-friendly multiple choice quiz in valid JSON only.
+
+Return:
+{
+  "title": "string",
+  "description": "string",
+  "questions": [
+    {
+      "id": "q-1",
+      "prompt": "string",
+      "options": ["string", "string", "string", "string"],
+      "answerIndex": 0,
+      "explanation": "string"
+    }
+  ]
+}
+
+Rules:
+- Generate 6 to 8 questions.
+- Use only 4 answer choices per question.
+- Questions must be based on the selected modules/files.
+- Keep prompts clear and exam-style.
+- Explanations must be brief and helpful.
+- Return JSON only.
+
+Course: ${courseName}
+Module: ${moduleName || "Selected course scope"}
+Resource titles: ${JSON.stringify(resourceSummary)}
+Content:
+${contentSummary || "No extracted file text was available. Use the resource titles and scope."}`
+    }],
+  });
+
+  const rawText = message.content[0]?.text || "";
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    return buildFallbackQuiz({ title, courseName, moduleName, resources });
+  }
+}
+
+function shapeSavedQuiz({
+  userId,
+  courseId,
+  courseName,
+  scopeType,
+  moduleId = null,
+  moduleName = null,
+  title,
+  quiz,
+  selectedModuleIds = [],
+  selectedFileIds = [],
+}) {
+  const now = new Date().toISOString();
+  return {
+    id: `${userId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    userId,
+    courseId,
+    courseName,
+    scopeType,
+    moduleId,
+    moduleName,
+    title,
+    selectedModuleIds,
+    selectedFileIds,
+    description: quiz.description || "",
+    questions: Array.isArray(quiz.questions) ? quiz.questions : [],
+    createdAt: now,
+    updatedAt: now,
+    taken: false,
+    lastAttempt: null,
+  };
+}
+
+function rewriteWeeklyPlanFromModules({
+  weeklyPlan = [],
+  scopedModules = [],
+  moduleResources = [],
+  assignments = [],
+}) {
+  const resourceMap = new Map(
+    moduleResources.map((module) => [String(module.id), module.resources || []])
+  );
+  const sortedAssignments = [...assignments]
+    .filter((assignment) => assignment.due_at)
+    .sort((a, b) => new Date(a.due_at) - new Date(b.due_at));
+
+  return weeklyPlan.map((week, index) => {
+    const currentModule = scopedModules.length > 0
+      ? scopedModules[index % scopedModules.length]
+      : null;
+    const resources = currentModule ? resourceMap.get(String(currentModule.id)) || [] : [];
+    const primary = resources[0]?.title || "";
+    const secondary = resources[1]?.title || "";
+    const assignment = sortedAssignments[index];
+
+    const focus = currentModule
+      ? primary
+        ? `${currentModule.name}: study ${primary}.`
+        : `Study ${currentModule.name} and capture the main ideas.`
+      : week.focus;
+
+    const tasks = [
+      currentModule && primary
+        ? `Read "${primary}" and note the key concepts.`
+        : currentModule
+          ? `Review ${currentModule.name} and write the key takeaways.`
+          : week.tasks?.[0] || "Review the selected material.",
+      currentModule && secondary
+        ? `Summarize "${secondary}" in a few bullet points.`
+        : "Write 3 to 5 recall questions from this material.",
+      assignment
+        ? `Schedule time for ${assignment.name} before ${formatDateLabel(assignment.due_at)}.`
+        : "Do one focused practice block on the hardest concept.",
+    ];
+
+    return {
+      ...week,
+      focus,
+      tasks,
+    };
+  });
+}
+
 function buildFallbackStudyPlan({
   courseName,
   syllabusText,
   assignments,
   preferences,
   scopedModules = [],
+  moduleResources = [],
 }) {
   const cleanSyllabus = stripHtml(syllabusText || "");
   const sentences = cleanSyllabus.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const overview = sentences.slice(0, 3).join(" ") || `Study plan for ${courseName}.`;
+  const overview = sentences.slice(0, 1).join(" ") || `Study plan for ${courseName}.`;
   const sortedAssignments = [...assignments]
     .filter((assignment) => assignment.due_at)
     .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
     .slice(0, 6);
+  const milestoneCandidates = buildMilestoneCandidates({
+    assignments,
+    preferences,
+    scopedModules,
+  });
   const weeklyRanges = enumerateWeeklyRanges(preferences.startDate, preferences.endDate);
   const moduleNames = scopedModules.map((module) => module.name).filter(Boolean);
+  const scopedResourceMap = new Map(
+    moduleResources.map((module) => [String(module.id), module.resources || []])
+  );
 
   const weeklyHours = preferences.hoursPerWeek;
   const sessionCount = Math.max(
@@ -245,9 +581,12 @@ function buildFallbackStudyPlan({
     preferences.priorities.length > 0
       ? `Prioritize ${preferences.priorities.join(", ")}.`
       : "Balance understanding, revision, and assignment progress.";
+  const objectiveLabel = (preferences.objective || "your goal")
+    .replace(/^stay on track in\s+/i, "")
+    .trim();
 
   return {
-    overview: `${overview} This plan covers ${formatDateLabel(preferences.startDate)} to ${formatDateLabel(preferences.endDate)} for ${preferences.objective.toLowerCase()}.`,
+    overview: `${overview} Focus window: ${formatDateLabel(preferences.startDate)} to ${formatDateLabel(preferences.endDate)}.`,
     recommendations: [
       `Study about ${weeklyHours} hours per week in ${preferences.sessionMinutes}-minute sessions.`,
       `Use ${preferences.focusDays.join(", ")} as your main study days with roughly ${sessionsPerDay} focused block(s) each day across the full date range.`,
@@ -256,28 +595,41 @@ function buildFallbackStudyPlan({
         ? `Focus only on these modules: ${moduleNames.join(", ")}.`
         : "Use all available modules and related materials in scope.",
     ],
-    weeklyPlan: weeklyRanges.map((range, index) => ({
-      day: range.label,
-      focus: index === 0
-        ? `Set up your ${preferences.objective.toLowerCase()} strategy and preview key topics`
-        : index === weeklyRanges.length - 1
-          ? "Consolidate, self-test, and close remaining weak spots"
-          : "Work through the scoped material and reinforce understanding",
-      tasks: [
-        moduleNames[index]
-          ? `Focus on module: ${moduleNames[index]}.`
-          : "Review notes, readings, and course pages in your chosen scope.",
-        "Create or refine flashcards from the highest-yield concepts.",
-        sortedAssignments[index]
-          ? `Make progress on "${sortedAssignments[index].name}" before ${formatDateLabel(sortedAssignments[index].due_at)}.`
-          : `Complete one focused study block on the hardest topic during ${range.label}.`,
-      ],
-    })),
-    milestones: sortedAssignments.map((assignment) => ({
-      title: assignment.name,
-      dueDate: assignment.due_at,
-      reason: `Assignment worth ${assignment.points_possible ?? "?"} points is due ${formatDateLabel(assignment.due_at)}.`,
-    })),
+    weeklyPlan: weeklyRanges.map((range, index) => {
+      const currentModule = scopedModules[index % Math.max(scopedModules.length, 1)] || null;
+      const currentModuleResources = currentModule
+        ? scopedResourceMap.get(String(currentModule.id)) || []
+        : [];
+      const primaryResource = currentModuleResources[0]?.title || "";
+      const secondaryResource = currentModuleResources[1]?.title || "";
+
+      return {
+        day: range.label,
+        focus: index === 0
+          ? currentModule
+            ? `Preview ${currentModule.name} and map the main concepts.`
+            : `Preview the key ideas for ${objectiveLabel || courseName}.`
+          : index === weeklyRanges.length - 1
+            ? "Review, self-test, and close weak spots."
+            : currentModule
+              ? `Work through ${currentModule.name} and reinforce understanding.`
+              : "Study the selected material and reinforce understanding.",
+        tasks: [
+          currentModule && primaryResource
+            ? `Read or review "${primaryResource}" from ${currentModule.name}.`
+            : moduleNames[index]
+              ? `Review ${moduleNames[index]} and note the main ideas.`
+              : "Review notes, readings, and course pages in your scope.",
+          currentModule && secondaryResource
+            ? `Summarize "${secondaryResource}" in 3 bullet points.`
+            : "Write 3 to 5 quick recall questions.",
+          sortedAssignments[index]
+            ? `Plan time for ${sortedAssignments[index].name} before ${formatDateLabel(sortedAssignments[index].due_at)}.`
+            : "Spend one session on the hardest topic this week.",
+        ],
+      };
+    }),
+    milestones: milestoneCandidates,
     customTips: [
       "Turn each module into 3 to 5 recall questions.",
       "Reserve one session each week only for practice and self-testing.",
@@ -361,12 +713,61 @@ async function resolveCourseSyllabus(courseId) {
   };
 }
 
+function buildMilestoneCandidates({
+  assignments,
+  preferences,
+  scopedModules = [],
+}) {
+  const normalizedModuleNames = scopedModules
+    .map((module) => module.name)
+    .filter(Boolean)
+    .map((name) => name.toLowerCase());
+
+  const rangeStart = new Date(`${preferences.startDate}T00:00:00`).getTime();
+  const rangeEnd = new Date(`${preferences.endDate}T23:59:59`).getTime();
+
+  const rangedAssignments = assignments
+    .filter((assignment) => {
+      if (!preferences.includeAssignments || !assignment.due_at) return false;
+      const dueAt = new Date(assignment.due_at).getTime();
+      if (Number.isNaN(dueAt)) return false;
+      return dueAt >= rangeStart && dueAt <= rangeEnd;
+    })
+    .sort((a, b) => new Date(a.due_at) - new Date(b.due_at));
+
+  if (normalizedModuleNames.length > 0) {
+    const start = new Date(`${preferences.startDate}T12:00:00`);
+    const end = new Date(`${preferences.endDate}T12:00:00`);
+    const rangeMs = Math.max(0, end.getTime() - start.getTime());
+    const stepMs =
+      scopedModules.length > 1 ? Math.floor(rangeMs / (scopedModules.length - 1 || 1)) : rangeMs;
+
+    return scopedModules.slice(0, 6).map((module, index) => ({
+      title: module.name,
+      dueDate: Number.isNaN(start.getTime())
+        ? preferences.endDate || null
+        : new Date(start.getTime() + stepMs * index).toISOString(),
+      reason:
+        index === 0
+          ? "Start this selected module first and complete its core topics by this checkpoint."
+          : "Use this checkpoint to finish the selected module before moving on.",
+    }));
+  }
+
+  return rangedAssignments.slice(0, 6).map((assignment) => ({
+    title: assignment.name,
+    dueDate: assignment.due_at,
+    reason: `Assignment worth ${assignment.points_possible ?? "?"} points is due ${formatDateLabel(assignment.due_at)}.`,
+  }));
+}
+
 async function generateStudyPlanWithAI({
   courseName,
   syllabusText,
   assignments,
   preferences,
   scopedModules = [],
+  moduleResources = [],
 }) {
   let ai = null;
   try {
@@ -378,6 +779,7 @@ async function generateStudyPlanWithAI({
       assignments,
       preferences,
       scopedModules,
+      moduleResources,
     });
   }
 
@@ -393,6 +795,17 @@ async function generateStudyPlanWithAI({
     name: module.name,
     position: module.position,
   }));
+  const moduleResourceSummary = moduleResources.map((module) => ({
+    id: module.id,
+    name: module.name,
+    resources: (module.resources || []).map((resource) => resource.title).slice(0, 5),
+  }));
+
+  const milestoneGuide = buildMilestoneCandidates({
+    assignments,
+    preferences,
+    scopedModules,
+  });
 
   const prompt = `Create a student-friendly study plan in valid JSON.
 
@@ -407,14 +820,19 @@ Course: ${courseName}
 Preferences: ${JSON.stringify(preferences)}
 Assignments: ${JSON.stringify(assignmentSummary)}
 Scoped modules: ${JSON.stringify(moduleSummary)}
+Module resources: ${JSON.stringify(moduleResourceSummary)}
+Preferred milestones: ${JSON.stringify(milestoneGuide)}
 Syllabus: ${stripHtml(syllabusText).slice(0, 12000)}
 
 Rules:
 - Keep recommendations concise.
 - Build the weekly plan across the full startDate to endDate range, not just one week.
 - Match the plan to the provided objective and selected modules.
-- Make milestones practical and tied to due dates when available.
+- Make milestones follow the selected modules first. Do not default to unrelated homework when scoped modules are provided.
 - If selected modules are provided, concentrate only on that portion of the course.
+- Use the actual module names and resource titles when writing weekly focus labels and tasks.
+- Keep each weekly focus to one short line.
+- Keep each task short and concrete.
 - Return JSON only.`;
 
   const message = await ai.messages.create({
@@ -425,7 +843,20 @@ Rules:
 
   const rawText = message.content[0]?.text || "";
   try {
-    return JSON.parse(rawText);
+    const parsed = JSON.parse(rawText);
+    return {
+      ...parsed,
+      weeklyPlan: rewriteWeeklyPlanFromModules({
+        weeklyPlan: Array.isArray(parsed.weeklyPlan) ? parsed.weeklyPlan : [],
+        scopedModules,
+        moduleResources,
+        assignments,
+      }),
+      milestones:
+        Array.isArray(parsed.milestones) && parsed.milestones.length > 0
+          ? parsed.milestones
+          : milestoneGuide,
+    };
   } catch {
     return buildFallbackStudyPlan({
       courseName,
@@ -433,6 +864,7 @@ Rules:
       assignments,
       preferences,
       scopedModules,
+      moduleResources,
     });
   }
 }
@@ -1262,7 +1694,7 @@ ${truncated}`
 });
 
 app.post("/api/study-plan", async (req, res) => {
-  const { courseId, preferences = {} } = req.body;
+  const { courseId, preferences = {}, userId = null } = req.body;
   if (!courseId) {
     return res.status(400).json({ error: "courseId is required" });
   }
@@ -1282,13 +1714,58 @@ app.post("/api/study-plan", async (req, res) => {
             normalizedPreferences.selectedModuleIds.includes(String(module.id))
           )
         : modules;
+    const moduleResources = await getStudyPlanModuleResources(courseId, scopedModules);
     const plan = await generateStudyPlanWithAI({
       courseName: course.name,
       syllabusText,
       assignments,
       preferences: normalizedPreferences,
       scopedModules,
+      moduleResources,
     });
+
+    let autoQuizCount = 0;
+    if (userId && scopedModules.length > 0) {
+      const store = readQuizStore();
+      const normalizedUserId = String(userId);
+      const existing = Array.isArray(store.quizzesByUser?.[normalizedUserId])
+        ? store.quizzesByUser[normalizedUserId]
+        : [];
+
+      const generatedQuizzes = await Promise.all(
+        scopedModules.map(async (module) => {
+          const moduleScope = moduleResources.find((entry) => String(entry.id) === String(module.id)) || {
+            id: module.id,
+            name: module.name,
+            resources: [],
+            files: [],
+          };
+          const quiz = await generateQuizWithAI({
+            title: `${module.name} Quiz`,
+            courseName: course.name,
+            moduleName: module.name,
+            resources: moduleScope.resources || [],
+            fileTexts: moduleScope.files || [],
+          });
+          return shapeSavedQuiz({
+            userId: normalizedUserId,
+            courseId: course.id,
+            courseName: course.name,
+            scopeType: "study_plan_module",
+            moduleId: module.id,
+            moduleName: module.name,
+            title: quiz.title || `${module.name} Quiz`,
+            quiz,
+            selectedModuleIds: [String(module.id)],
+          });
+        })
+      );
+
+      store.quizzesByUser = store.quizzesByUser || {};
+      store.quizzesByUser[normalizedUserId] = [...generatedQuizzes, ...existing];
+      writeQuizStore(store);
+      autoQuizCount = generatedQuizzes.length;
+    }
 
     res.json({
       courseId: course.id,
@@ -1303,6 +1780,7 @@ app.post("/api/study-plan", async (req, res) => {
         position: module.position,
       })),
       plan,
+      autoQuizCount,
     });
   } catch (err) {
     res
@@ -1312,6 +1790,306 @@ app.post("/api/study-plan", async (req, res) => {
 });
 
 // ── Start ──────────────────────────────────────────────────
+
+app.get("/api/study-plans", async (req, res) => {
+  const userId = String(req.query.userId || "").trim();
+  if (!userId) {
+    return res.status(400).json({ error: "userId is required" });
+  }
+
+  try {
+    const store = readStudyPlanStore();
+    const plans = Array.isArray(store.plansByUser?.[userId]) ? store.plansByUser[userId] : [];
+    res.json(
+      plans
+        .slice()
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+    );
+  } catch (err) {
+    res.status(500).json({ error: `Failed to load saved study plans: ${err.message}` });
+  }
+});
+
+app.get("/api/quizzes", async (req, res) => {
+  const userId = String(req.query.userId || "").trim();
+  if (!userId) {
+    return res.status(400).json({ error: "userId is required" });
+  }
+
+  try {
+    const store = readQuizStore();
+    const quizzes = Array.isArray(store.quizzesByUser?.[userId]) ? store.quizzesByUser[userId] : [];
+    res.json(
+      quizzes
+        .slice()
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0))
+    );
+  } catch (err) {
+    res.status(500).json({ error: `Failed to load quizzes: ${err.message}` });
+  }
+});
+
+app.post("/api/quizzes/generate", async (req, res) => {
+  const {
+    userId,
+    courseId,
+    courseName,
+    mode = "manual",
+    title,
+    selectedModuleIds = [],
+    selectedFileIds = [],
+  } = req.body || {};
+
+  if (!userId || !courseId || !courseName) {
+    return res.status(400).json({ error: "userId, courseId, and courseName are required" });
+  }
+
+  try {
+    const modules = await canvasRequestAll(`/courses/${courseId}/modules?per_page=100`);
+    const scopedModules =
+      Array.isArray(selectedModuleIds) && selectedModuleIds.length > 0
+        ? modules.filter((module) => selectedModuleIds.includes(String(module.id)))
+        : modules;
+    const moduleScopes = await collectQuizScope(
+      courseId,
+      scopedModules,
+      Array.isArray(selectedFileIds) ? selectedFileIds.map(String) : []
+    );
+    const store = readQuizStore();
+    const normalizedUserId = String(userId);
+    const existing = Array.isArray(store.quizzesByUser?.[normalizedUserId])
+      ? store.quizzesByUser[normalizedUserId]
+      : [];
+
+    let generated = [];
+
+    if (mode === "study_plan") {
+      generated = await Promise.all(
+        moduleScopes.map(async (moduleScope) => {
+          const quiz = await generateQuizWithAI({
+            title: `${moduleScope.name} Quiz`,
+            courseName,
+            moduleName: moduleScope.name,
+            resources: moduleScope.resources || [],
+            fileTexts: moduleScope.files || [],
+          });
+          return shapeSavedQuiz({
+            userId: normalizedUserId,
+            courseId,
+            courseName,
+            scopeType: "study_plan_module",
+            moduleId: moduleScope.id,
+            moduleName: moduleScope.name,
+            title: quiz.title || `${moduleScope.name} Quiz`,
+            quiz,
+            selectedModuleIds: [String(moduleScope.id)],
+          });
+        })
+      );
+    } else {
+      const combinedResources = moduleScopes.flatMap((moduleScope) =>
+        (moduleScope.resources || []).map((resource) => ({
+          ...resource,
+          title: `${moduleScope.name}: ${resource.title}`,
+        }))
+      );
+      const combinedFiles = moduleScopes.flatMap((moduleScope) => moduleScope.files || []);
+      const quiz = await generateQuizWithAI({
+        title: title || `${courseName} Custom Quiz`,
+        courseName,
+        moduleName: scopedModules.length === 1 ? scopedModules[0].name : null,
+        resources: combinedResources,
+        fileTexts: combinedFiles,
+      });
+      generated = [
+        shapeSavedQuiz({
+          userId: normalizedUserId,
+          courseId,
+          courseName,
+          scopeType: "manual",
+          title: quiz.title || title || `${courseName} Custom Quiz`,
+          quiz,
+          selectedModuleIds: scopedModules.map((module) => String(module.id)),
+          selectedFileIds: Array.isArray(selectedFileIds) ? selectedFileIds.map(String) : [],
+        }),
+      ];
+    }
+
+    store.quizzesByUser = store.quizzesByUser || {};
+    store.quizzesByUser[normalizedUserId] = [...generated, ...existing];
+    writeQuizStore(store);
+    res.status(201).json(generated);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: `Quiz generation failed: ${err.message}` });
+  }
+});
+
+app.put("/api/quizzes/:quizId/submit", async (req, res) => {
+  const quizId = String(req.params.quizId || "").trim();
+  const { userId, answers = [] } = req.body || {};
+  if (!quizId || !userId) {
+    return res.status(400).json({ error: "quizId and userId are required" });
+  }
+
+  try {
+    const store = readQuizStore();
+    const normalizedUserId = String(userId);
+    const quizzes = Array.isArray(store.quizzesByUser?.[normalizedUserId])
+      ? store.quizzesByUser[normalizedUserId]
+      : [];
+    const index = quizzes.findIndex((quiz) => quiz.id === quizId);
+    if (index === -1) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    const quiz = quizzes[index];
+    const answerMap = new Map(
+      Array.isArray(answers)
+        ? answers.map((answer) => [String(answer.questionId), Number(answer.answerIndex)])
+        : []
+    );
+    const results = (quiz.questions || []).map((question) => {
+      const selectedIndex = answerMap.get(String(question.id));
+      const isCorrect = selectedIndex === question.answerIndex;
+      return {
+        questionId: question.id,
+        selectedIndex: Number.isFinite(selectedIndex) ? selectedIndex : null,
+        correctIndex: question.answerIndex,
+        isCorrect,
+      };
+    });
+    const correctCount = results.filter((result) => result.isCorrect).length;
+    const score = quiz.questions.length > 0
+      ? Math.round((correctCount / quiz.questions.length) * 100)
+      : 0;
+
+    const updatedQuiz = {
+      ...quiz,
+      taken: true,
+      updatedAt: new Date().toISOString(),
+      lastAttempt: {
+        takenAt: new Date().toISOString(),
+        answers: results,
+        score,
+        correctCount,
+        totalQuestions: quiz.questions.length,
+      },
+    };
+
+    quizzes[index] = updatedQuiz;
+    store.quizzesByUser[normalizedUserId] = quizzes;
+    writeQuizStore(store);
+    res.json(updatedQuiz);
+  } catch (err) {
+    res.status(500).json({ error: `Quiz submission failed: ${err.message}` });
+  }
+});
+
+app.post("/api/study-plans", async (req, res) => {
+  const {
+    userId,
+    planName,
+    goalName,
+    courseId,
+    courseName,
+    preferences,
+    scopedModules = [],
+    plan,
+    schedule = [],
+  } = req.body || {};
+
+  if (!userId || !planName || !courseId || !courseName || !plan) {
+    return res.status(400).json({
+      error: "userId, planName, courseId, courseName, and plan are required",
+    });
+  }
+
+  try {
+    const store = readStudyPlanStore();
+    const normalizedUserId = String(userId);
+    const plans = Array.isArray(store.plansByUser?.[normalizedUserId])
+      ? store.plansByUser[normalizedUserId]
+      : [];
+    const now = new Date().toISOString();
+
+    const savedPlan = {
+      id: `${normalizedUserId}-${Date.now()}`,
+      userId: normalizedUserId,
+      planName,
+      goalName: goalName || planName,
+      courseId,
+      courseName,
+      preferences,
+      scopedModules,
+      plan,
+      schedule,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    store.plansByUser = store.plansByUser || {};
+    store.plansByUser[normalizedUserId] = [savedPlan, ...plans];
+    writeStudyPlanStore(store);
+    res.status(201).json(savedPlan);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to save study plan: ${err.message}` });
+  }
+});
+
+app.put("/api/study-plans/:planId", async (req, res) => {
+  const planId = String(req.params.planId || "").trim();
+  const {
+    userId,
+    planName,
+    goalName,
+    courseId,
+    courseName,
+    preferences,
+    scopedModules = [],
+    plan,
+    schedule = [],
+  } = req.body || {};
+
+  if (!planId || !userId || !planName || !courseId || !courseName || !plan) {
+    return res.status(400).json({
+      error: "planId, userId, planName, courseId, courseName, and plan are required",
+    });
+  }
+
+  try {
+    const store = readStudyPlanStore();
+    const normalizedUserId = String(userId);
+    const plans = Array.isArray(store.plansByUser?.[normalizedUserId])
+      ? store.plansByUser[normalizedUserId]
+      : [];
+    const existingIndex = plans.findIndex((savedPlan) => savedPlan.id === planId);
+
+    if (existingIndex === -1) {
+      return res.status(404).json({ error: "Saved study plan not found" });
+    }
+
+    const existingPlan = plans[existingIndex];
+    const updatedPlan = {
+      ...existingPlan,
+      planName,
+      goalName: goalName || planName,
+      courseId,
+      courseName,
+      preferences,
+      scopedModules,
+      plan,
+      schedule,
+      updatedAt: new Date().toISOString(),
+    };
+
+    plans[existingIndex] = updatedPlan;
+    store.plansByUser[normalizedUserId] = plans;
+    writeStudyPlanStore(store);
+    res.json(updatedPlan);
+  } catch (err) {
+    res.status(500).json({ error: `Failed to update study plan: ${err.message}` });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`Backend running → http://localhost:${PORT}`);

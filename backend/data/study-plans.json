@@ -1,0 +1,299 @@
+{
+  "plansByUser": {
+    "1142825": [
+      {
+        "id": "1142825-1775344282098",
+        "userId": "1142825",
+        "planName": "Stay on track in CSE 512: Distributed Database Systems (2025 Fall C)",
+        "goalName": "Stay on track in CSE 512: Distributed Database Systems (2025 Fall C)",
+        "courseId": 231656,
+        "courseName": "CSE 512: Distributed Database Systems (2025 Fall C)",
+        "preferences": {
+          "startDate": "2026-04-04",
+          "endDate": "2026-04-18",
+          "objective": "Stay on track in CSE 512: Distributed Database Systems (2025 Fall C)",
+          "hoursPerWeek": 8,
+          "sessionMinutes": 60,
+          "focusDays": [
+            "Tue",
+            "Thu"
+          ],
+          "priorities": [
+            "practice"
+          ],
+          "selectedModuleIds": [
+            "2641742",
+            "2641761",
+            "2641757"
+          ],
+          "includeAssignments": true,
+          "pace": "intensive"
+        },
+        "scopedModules": [
+          {
+            "id": 2641742,
+            "name": "W03 - 9/10",
+            "position": 3
+          },
+          {
+            "id": 2641757,
+            "name": "W05 - 9/24",
+            "position": 5
+          },
+          {
+            "id": 2641761,
+            "name": "W07 - 10/08",
+            "position": 7
+          }
+        ],
+        "plan": {
+          "overview": "Course Description: Distributed Database Systems (DDS) is a 3-credit course that offers a comprehensive exploration of managing data across interconnected databases.",
+          "recommendations": [
+            "Study about 8 hours per week in 60-minute sessions.",
+            "Use Tue, Thu as your main study days with roughly 4 focused block(s) each day across the full date range.",
+            "Prioritize practice.",
+            "Focus only on these modules: W03 - 9/10, W05 - 9/24, W07 - 10/08."
+          ],
+          "weeklyPlan": [
+            {
+              "day": "Week 1 • Apr 4, 2026 - Apr 10, 2026",
+              "focus": "W03 - 9/10: review the core ideas.",
+              "tasks": [
+                "Review W03 - 9/10 and capture the key ideas.",
+                "Write 3 to 5 quick recall questions.",
+                "Finish one focused practice block for this session."
+              ]
+            },
+            {
+              "day": "Week 2 • Apr 11, 2026 - Apr 17, 2026",
+              "focus": "W05 - 9/24: review the core ideas.",
+              "tasks": [
+                "Review W05 - 9/24 and capture the key ideas.",
+                "Write 3 to 5 quick recall questions.",
+                "Finish one focused practice block for this session."
+              ]
+            },
+            {
+              "day": "Week 3 • Apr 18, 2026 - Apr 18, 2026",
+              "focus": "W07 - 10/08: review the core ideas.",
+              "tasks": [
+                "Review W07 - 10/08 and capture the key ideas.",
+                "Write 3 to 5 quick recall questions.",
+                "Finish one focused practice block for this session."
+              ]
+            }
+          ],
+          "milestones": [
+            {
+              "title": "W03 - 9/10",
+              "dueDate": "2026-04-04T19:00:00.000Z",
+              "reason": "Start this selected module first and complete its core topics by this checkpoint."
+            },
+            {
+              "title": "W05 - 9/24",
+              "dueDate": "2026-04-11T19:00:00.000Z",
+              "reason": "Use this checkpoint to finish the selected module before moving on."
+            },
+            {
+              "title": "W07 - 10/08",
+              "dueDate": "2026-04-18T19:00:00.000Z",
+              "reason": "Use this checkpoint to finish the selected module before moving on."
+            }
+          ],
+          "customTips": [
+            "Turn each module into 3 to 5 recall questions.",
+            "Reserve one session each week only for practice and self-testing.",
+            "Update this plan after new announcements or due dates appear in Canvas."
+          ]
+        },
+        "schedule": [
+          {
+            "day": "Week 1 • Apr 4, 2026 - Apr 10, 2026",
+            "focus": "Preview the key ideas for CSE 512: Distributed Database Systems (2025 Fall C).",
+            "tasks": [
+              "Review W03 - 9/10 and capture the key ideas.",
+              "Write 3 to 5 quick recall questions.",
+              "Finish one focused practice block for this session."
+            ],
+            "sessions": [
+              {
+                "day": "Mon",
+                "timeLabel": "08:00",
+                "endLabel": "09:00",
+                "title": "Preview the key ideas for CSE 512: Distributed Database Systems (2025 Fall C).",
+                "tasks": [
+                  "Review W03 - 9/10 and capture the key ideas."
+                ],
+                "tone": "rose"
+              },
+              {
+                "day": "Tue",
+                "timeLabel": "10:00",
+                "endLabel": "11:00",
+                "title": "Preview the key ideas for CSE 512: Distributed Database Systems (2025 Fall C).",
+                "tasks": [
+                  "Write 3 to 5 quick recall questions."
+                ],
+                "tone": "peach"
+              },
+              {
+                "day": "Wed",
+                "timeLabel": "12:00",
+                "endLabel": "13:00",
+                "title": "Preview the key ideas for CSE 512: Distributed Database Systems (2025 Fall C).",
+                "tasks": [
+                  "Finish one focused practice block for this session."
+                ],
+                "tone": "gold"
+              },
+              {
+                "day": "Thu",
+                "timeLabel": "14:00",
+                "endLabel": "15:00",
+                "title": "Preview the key ideas for CSE 512: Distributed Database Systems (2025 Fall C).",
+                "tasks": [
+                  "Review the current material scope."
+                ],
+                "tone": "lavender"
+              },
+              {
+                "day": "Fri",
+                "timeLabel": "16:00",
+                "endLabel": "17:00",
+                "title": "Preview the key ideas for CSE 512: Distributed Database Systems (2025 Fall C).",
+                "tasks": [
+                  "Review the current material scope."
+                ],
+                "tone": "rose"
+              }
+            ]
+          },
+          {
+            "day": "Week 2 • Apr 11, 2026 - Apr 17, 2026",
+            "focus": "Study the selected material and reinforce understanding.",
+            "tasks": [
+              "Review W05 - 9/24 and capture the key ideas.",
+              "Write 3 to 5 quick recall questions.",
+              "Finish one focused practice block for this session."
+            ],
+            "sessions": [
+              {
+                "day": "Mon",
+                "timeLabel": "10:00",
+                "endLabel": "11:00",
+                "title": "Study the selected material and reinforce understanding.",
+                "tasks": [
+                  "Review W05 - 9/24 and capture the key ideas."
+                ],
+                "tone": "peach"
+              },
+              {
+                "day": "Tue",
+                "timeLabel": "12:00",
+                "endLabel": "13:00",
+                "title": "Study the selected material and reinforce understanding.",
+                "tasks": [
+                  "Write 3 to 5 quick recall questions."
+                ],
+                "tone": "gold"
+              },
+              {
+                "day": "Wed",
+                "timeLabel": "14:00",
+                "endLabel": "15:00",
+                "title": "Study the selected material and reinforce understanding.",
+                "tasks": [
+                  "Finish one focused practice block for this session."
+                ],
+                "tone": "lavender"
+              },
+              {
+                "day": "Thu",
+                "timeLabel": "16:00",
+                "endLabel": "17:00",
+                "title": "Study the selected material and reinforce understanding.",
+                "tasks": [
+                  "Review the current material scope."
+                ],
+                "tone": "rose"
+              },
+              {
+                "day": "Fri",
+                "timeLabel": "08:00",
+                "endLabel": "09:00",
+                "title": "Study the selected material and reinforce understanding.",
+                "tasks": [
+                  "Review the current material scope."
+                ],
+                "tone": "peach"
+              }
+            ]
+          },
+          {
+            "day": "Week 3 • Apr 18, 2026 - Apr 18, 2026",
+            "focus": "Review, self-test, and close weak spots.",
+            "tasks": [
+              "Review W07 - 10/08 and capture the key ideas.",
+              "Write 3 to 5 quick recall questions.",
+              "Finish one focused practice block for this session."
+            ],
+            "sessions": [
+              {
+                "day": "Mon",
+                "timeLabel": "12:00",
+                "endLabel": "13:00",
+                "title": "Review, self-test, and close weak spots.",
+                "tasks": [
+                  "Review W07 - 10/08 and capture the key ideas."
+                ],
+                "tone": "gold"
+              },
+              {
+                "day": "Tue",
+                "timeLabel": "14:00",
+                "endLabel": "15:00",
+                "title": "Review, self-test, and close weak spots.",
+                "tasks": [
+                  "Write 3 to 5 quick recall questions."
+                ],
+                "tone": "lavender"
+              },
+              {
+                "day": "Wed",
+                "timeLabel": "16:00",
+                "endLabel": "17:00",
+                "title": "Review, self-test, and close weak spots.",
+                "tasks": [
+                  "Finish one focused practice block for this session."
+                ],
+                "tone": "rose"
+              },
+              {
+                "day": "Thu",
+                "timeLabel": "08:00",
+                "endLabel": "09:00",
+                "title": "Review, self-test, and close weak spots.",
+                "tasks": [
+                  "Review the current material scope."
+                ],
+                "tone": "peach"
+              },
+              {
+                "day": "Fri",
+                "timeLabel": "10:00",
+                "endLabel": "11:00",
+                "title": "Review, self-test, and close weak spots.",
+                "tasks": [
+                  "Review the current material scope."
+                ],
+                "tone": "gold"
+              }
+            ]
+          }
+        ],
+        "createdAt": "2026-04-04T23:11:22.098Z",
+        "updatedAt": "2026-04-05T00:10:41.345Z"
+      }
+    ]
+  }
+}

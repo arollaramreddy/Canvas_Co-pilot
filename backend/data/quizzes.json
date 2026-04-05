@@ -1,0 +1,124 @@
+{
+  "quizzesByUser": {
+    "1142825": [
+      {
+        "id": "1142825-1775351625489-06z65e",
+        "userId": "1142825",
+        "courseId": "199350",
+        "courseName": "EEE 549: Statistical ML: Theory to Prac (2024 Fall C)",
+        "scopeType": "manual",
+        "moduleId": null,
+        "moduleName": null,
+        "title": "EEE 549: Statistical ML: Theory to Prac (2024 Fall C) Custom Quiz",
+        "selectedModuleIds": [
+          "2232210"
+        ],
+        "selectedFileIds": [],
+        "description": "Practice quiz for Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing.",
+        "questions": [
+          {
+            "id": "q-1",
+            "prompt": "Which statement best matches the topic \"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: How to Access Slack: YouTube Video\"?",
+            "options": [
+              "It is a key concept from Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing.",
+              "It is unrelated to the selected study material.",
+              "It only matters outside this course.",
+              "It should be skipped during review."
+            ],
+            "answerIndex": 0,
+            "explanation": "\"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: How to Access Slack: YouTube Video\" is part of the selected material and should be reviewed."
+          },
+          {
+            "id": "q-2",
+            "prompt": "Which statement best matches the topic \"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: Tutorial on Gradescope\"?",
+            "options": [
+              "It is a key concept from Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing.",
+              "It is unrelated to the selected study material.",
+              "It only matters outside this course.",
+              "It should be skipped during review."
+            ],
+            "answerIndex": 0,
+            "explanation": "\"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: Tutorial on Gradescope\" is part of the selected material and should be reviewed."
+          },
+          {
+            "id": "q-3",
+            "prompt": "Which statement best matches the topic \"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: Detailed-Syllabus-EEE549-Fall2024.pdf\"?",
+            "options": [
+              "It is a key concept from Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing.",
+              "It is unrelated to the selected study material.",
+              "It only matters outside this course.",
+              "It should be skipped during review."
+            ],
+            "answerIndex": 0,
+            "explanation": "\"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: Detailed-Syllabus-EEE549-Fall2024.pdf\" is part of the selected material and should be reviewed."
+          },
+          {
+            "id": "q-4",
+            "prompt": "Which statement best matches the topic \"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: Intro-MLE-StatML-2024-CourseOverview.pdf\"?",
+            "options": [
+              "It is a key concept from Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing.",
+              "It is unrelated to the selected study material.",
+              "It only matters outside this course.",
+              "It should be skipped during review."
+            ],
+            "answerIndex": 0,
+            "explanation": "\"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: Intro-MLE-StatML-2024-CourseOverview.pdf\" is part of the selected material and should be reviewed."
+          },
+          {
+            "id": "q-5",
+            "prompt": "Which statement best matches the topic \"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: RC-slides.pdf\"?",
+            "options": [
+              "It is a key concept from Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing.",
+              "It is unrelated to the selected study material.",
+              "It only matters outside this course.",
+              "It should be skipped during review."
+            ],
+            "answerIndex": 0,
+            "explanation": "\"Module 0A: Syllabus, overview of Gradescope, and Slack, ASU Research Computing: RC-slides.pdf\" is part of the selected material and should be reviewed."
+          }
+        ],
+        "createdAt": "2026-04-05T01:13:45.489Z",
+        "updatedAt": "2026-04-05T01:14:09.953Z",
+        "taken": true,
+        "lastAttempt": {
+          "takenAt": "2026-04-05T01:14:09.953Z",
+          "answers": [
+            {
+              "questionId": "q-1",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-2",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-3",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-4",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            },
+            {
+              "questionId": "q-5",
+              "selectedIndex": null,
+              "correctIndex": 0,
+              "isCorrect": false
+            }
+          ],
+          "score": 0,
+          "correctCount": 0,
+          "totalQuestions": 5
+        }
+      }
+    ]
+  }
+}

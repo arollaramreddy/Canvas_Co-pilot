@@ -19,6 +19,11 @@ const {
 } = require("./lib/state-sync");
 const { processQueuedAgentJobs } = require("./lib/agent-workers");
 const { buildLangGraphRuntimeState } = require("./lib/langgraph-runtime");
+const {
+  buildReplyDraftPrompt,
+  classifyMessageIntent,
+  getCourseFacts,
+} = require("./lib/curated-autonomous-message-agent");
 require("dotenv").config();
 
 const app = express();
@@ -374,6 +379,65 @@ function safeJsonParseObject(text) {
   return JSON.parse(match[0]);
 }
 
+function normalizeMatchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function buildFallbackMessageDraft(message, runtimeState) {
+  const intent = classifyMessageIntent(message, runtimeState);
+  const courseFacts = getCourseFacts(runtimeState);
+  const text = `${message?.subject || ""}\n${message?.last_message || ""}`;
+  const normalizedText = normalizeMatchText(text);
+
+  const matchedAssignment =
+    courseFacts.gradedAssignments.find((assignment) => {
+      const normalizedName = normalizeMatchText(assignment.name);
+      return normalizedName && normalizedText.includes(normalizedName);
+    }) ||
+    courseFacts.gradedAssignments.find((assignment) => {
+      const digitMatch = normalizedText.match(/assignment(\d+)/);
+      return digitMatch ? normalizeMatchText(assignment.name).includes(digitMatch[1]) : false;
+    }) ||
+    courseFacts.gradedAssignments[0] ||
+    null;
+
+  let draft = "Hi, I just checked Canvas and I’ll follow up with the details shortly.";
+  const usedState = [];
+
+  if (intent.asksForGrade && matchedAssignment) {
+    const scorePart =
+      matchedAssignment.points_possible
+        ? `${matchedAssignment.score}/${matchedAssignment.points_possible}`
+        : `${matchedAssignment.score}`;
+    const percentPart =
+      matchedAssignment.percent !== null && matchedAssignment.percent !== undefined
+        ? ` (${matchedAssignment.percent}%)`
+        : "";
+    draft = `Hi, I checked Canvas and I received ${scorePart}${percentPart} on ${matchedAssignment.name}.`;
+    usedState.push(`assignment score for ${matchedAssignment.name}`);
+  } else if (intent.asksForAssignment && courseFacts.upcomingAssignments[0]) {
+    const nextAssignment = courseFacts.upcomingAssignments[0];
+    draft = `Hi, I checked Canvas and the next assignment I can see is ${nextAssignment.name}${nextAssignment.due_at ? `, due ${nextAssignment.due_at}` : ""}.`;
+    usedState.push(`upcoming assignment ${nextAssignment.name}`);
+  } else if (intent.isCourseRelated) {
+    draft = "Hi, I checked Canvas and I can see the course details there. I can share the exact item once I confirm which assignment or grade you mean.";
+    usedState.push("course-aware Canvas workspace state");
+  }
+
+  return {
+    summary: "Fallback reply generated from Canvas state.",
+    classification: intent,
+    draft,
+    whyThisReply: [
+      "The message asks for course-related information.",
+      "A fallback reply was generated directly from available Canvas state.",
+    ],
+    usedState,
+  };
+}
+
 function isAssignmentCompleted(assignment) {
   const submission = assignment?.submission || assignment;
   return Boolean(
@@ -584,22 +648,70 @@ async function listActiveCanvasCourses(accessToken) {
   }));
 }
 
-async function buildInboxState(accessToken) {
+async function enrichConversationAuthor(conversation, accessToken, currentUser = null) {
+  try {
+    const detail = await canvasRequest(
+      `/conversations/${conversation.id}?include[]=messages&include[]=participants`,
+      accessToken
+    );
+    const messages = Array.isArray(detail?.messages) ? detail.messages : [];
+    const latestMessage = messages[messages.length - 1] || null;
+    const participants = Array.isArray(detail?.participants) ? detail.participants : [];
+    const participantById = new Map(
+      participants
+        .filter((participant) => participant?.id !== undefined && participant?.id !== null)
+        .map((participant) => [String(participant.id), participant])
+    );
+
+    const lastAuthorId =
+      latestMessage?.author_id !== undefined && latestMessage?.author_id !== null
+        ? String(latestMessage.author_id)
+        : null;
+    const lastAuthorName =
+      latestMessage?.author?.display_name ||
+      latestMessage?.author?.name ||
+      latestMessage?.author_name ||
+      (lastAuthorId ? participantById.get(lastAuthorId)?.name : null) ||
+      conversation.last_authored_message_author ||
+      null;
+    const sentByCurrentUser =
+      lastAuthorId && currentUser?.id ? String(currentUser.id) === String(lastAuthorId) : false;
+
+    return {
+      last_author_id: lastAuthorId,
+      last_author_name: lastAuthorName,
+      sent_by_current_user: sentByCurrentUser,
+    };
+  } catch {
+    return {
+      last_author_id: null,
+      last_author_name: conversation.last_authored_message_author || null,
+      sent_by_current_user: false,
+    };
+  }
+}
+
+async function buildInboxState(accessToken, currentUser = null) {
   const conversations = await canvasRequestAll(
     "/conversations?scope=inbox&per_page=30",
     10,
     accessToken
   ).catch(() => []);
+  const authorMeta = await Promise.all(
+    conversations.map((conversation) => enrichConversationAuthor(conversation, accessToken, currentUser))
+  );
 
   return {
     syncedAt: new Date().toISOString(),
-    messages: conversations.map((conversation) => ({
+    messages: conversations.map((conversation, index) => ({
       id: conversation.id,
       subject: conversation.subject || conversation.last_message || "Message",
       last_message: conversation.last_message || "",
       last_message_at: conversation.last_message_at || conversation.updated_at || null,
       message_count: conversation.message_count ?? 0,
-      last_author_name: conversation.last_authored_message_author || null,
+      last_author_id: authorMeta[index]?.last_author_id || null,
+      last_author_name: authorMeta[index]?.last_author_name || null,
+      sent_by_current_user: Boolean(authorMeta[index]?.sent_by_current_user),
       workflow_state: conversation.workflow_state || null,
     })),
   };
@@ -619,7 +731,7 @@ async function runAutonomousCanvasMonitor() {
       const courses = await listActiveCanvasCourses(active.session.accessToken);
       const watchCourses = courses.slice(0, 6);
 
-      const inboxState = await buildInboxState(active.session.accessToken);
+      const inboxState = await buildInboxState(active.session.accessToken, active.session.user);
       const inboxSync = syncInboxStateToEvents({
         db,
         userId: active.userId,
@@ -1597,7 +1709,8 @@ app.get("/api/platform/features", (req, res) => {
 app.get("/api/messages", async (req, res) => {
   try {
     const accessToken = getCanvasAccessToken(req);
-    const inbox = await buildInboxState(accessToken);
+    const context = getSessionContext(req);
+    const inbox = await buildInboxState(accessToken, context.session?.user || null);
     const limit = Number(req.query.limit || 10);
     res.json((inbox.messages || []).slice(0, limit));
   } catch (err) {
@@ -1608,8 +1721,23 @@ app.get("/api/messages", async (req, res) => {
 app.post("/api/messages/:messageId/draft-reply", async (req, res) => {
   try {
     const accessToken = getCanvasAccessToken(req);
-    const inbox = await buildInboxState(accessToken);
-    const message = (inbox.messages || []).find(
+    const sessionContext = getSessionContext(req);
+    const runtimeState = await buildLangGraphRuntimeState({
+      db,
+      request: {
+        workflowType: "message_reply",
+        preferences: {},
+      },
+      accessToken,
+      sessionId: sessionContext.sessionId,
+      userId: sessionContext.userId,
+      listActiveCanvasCourses,
+      buildWorkspaceState,
+      buildInboxState,
+      ensureTopicText,
+      computeInterventionScore,
+    });
+    const message = (runtimeState?.canvas?.inboxState?.messages || []).find(
       (item) => String(item.id) === String(req.params.messageId)
     );
 
@@ -1617,24 +1745,29 @@ app.post("/api/messages/:messageId/draft-reply", async (req, res) => {
       return res.status(404).json({ error: "Message not found in inbox" });
     }
 
-    const response = await createOpenAIResponse({
-      model: OPENAI_MODEL_AGENT,
-      input: `You are helping a student draft a short, natural reply to an inbox message.
-
-Return only the reply text, no greeting labels, no markdown.
-
-Message subject: ${message.subject}
-Latest sender: ${message.last_author_name || "Unknown"}
-Latest message:
-${message.last_message || ""}
-
-Write a helpful reply the student could send directly. Keep it concise and human.`,
-    });
+    let payload;
+    try {
+      const response = await createOpenAIResponse({
+        model: OPENAI_MODEL_AGENT,
+        input: buildReplyDraftPrompt({
+          message,
+          runtimeState,
+          preferences: runtimeState?.memory?.preferences || {},
+        }),
+      });
+      payload = safeJsonParseObject(extractResponseText(response) || "");
+    } catch {
+      payload = buildFallbackMessageDraft(message, runtimeState);
+    }
 
     res.json({
       messageId: message.id,
       subject: message.subject,
-      draft: extractResponseText(response) || "",
+      summary: payload.summary || "",
+      classification: payload.classification || null,
+      whyThisReply: payload.whyThisReply || [],
+      usedState: payload.usedState || [],
+      draft: payload.draft || "",
     });
   } catch (err) {
     res.status(err.status || 500).json({ error: `Failed to draft reply: ${err.message}` });

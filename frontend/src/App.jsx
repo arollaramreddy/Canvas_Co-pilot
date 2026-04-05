@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
+import AutonomousAgentsWorkingView from "./curated/AutonomousAgentsWorkingView";
+import useAutonomousInboxFeed from "./curated/useAutonomousInboxFeed";
 
 const API = "http://localhost:3001/api";
 
@@ -16,6 +18,20 @@ function App() {
   const [error, setError] = useState("");
   const [tokenInput, setTokenInput] = useState("");
   const [activeTab, setActiveTab] = useState("autonomous");
+  const {
+    drafts,
+    error: autonomousError,
+    feed,
+    loading: autonomousLoading,
+    draftingMessageId,
+    onDraftReply,
+    onPreferenceChange,
+    onSendReply,
+    preferences,
+    sendingMessageId,
+    syncNow,
+    syncing,
+  } = useAutonomousInboxFeed(undefined, user?.name || "");
 
   const apiFetchJson = useCallback(async (url, options = {}) => {
     const response = await fetch(url, {
@@ -179,11 +195,48 @@ function App() {
           <div className="tab-panel" role="tabpanel">
             {activeTab === "autonomous" ? (
               <div className="panel-copy">
-                <span className="panel-badge">Default view</span>
-                <h2>Autonomous agents working</h2>
-                <p>
-                  This is the default workspace tab after login.
-                </p>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+                  <div>
+                    <span className="panel-badge">Default view</span>
+                    <h2>Autonomous agents working</h2>
+                    <p>Inbox changes and agent-ready actions appear here.</p>
+                  </div>
+                  <button className="secondary-button" onClick={() => syncNow()} disabled={syncing}>
+                    {syncing ? "Syncing..." : "Sync inbox"}
+                  </button>
+                </div>
+
+                {autonomousError ? <div className="error-banner">{autonomousError}</div> : null}
+
+                {autonomousLoading ? (
+                  <p>Loading autonomous inbox...</p>
+                ) : (
+                  <AutonomousAgentsWorkingView
+                    feed={feed}
+                    preferences={preferences}
+                    draftingMessageId={draftingMessageId}
+                    onDraftReply={onDraftReply}
+                    onSendReply={onSendReply}
+                    onPreferenceChange={onPreferenceChange}
+                    sendingMessageId={sendingMessageId}
+                  />
+                )}
+
+                <div style={{ marginTop: 20 }}>
+                  <span className="panel-badge">Draft preview</span>
+                  <div className="login-card" style={{ marginTop: 12 }}>
+                    {Object.keys(drafts).length ? (
+                      Object.entries(drafts).map(([messageId, draft]) => (
+                        <div key={messageId} style={{ marginBottom: 16 }}>
+                          <strong>Message {messageId}</strong>
+                          <p style={{ whiteSpace: "pre-wrap", marginTop: 8 }}>{draft}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p>No draft yet. Click `Draft` on any inbox item.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="panel-copy">

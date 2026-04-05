@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import AutonomousAgentsWorkingView from "./curated/AutonomousAgentsWorkingView";
 import useAutonomousInboxFeed from "./curated/useAutonomousInboxFeed";
+import ManualStudentInteractionView from "./manual/ManualStudentInteractionView";
 
 const API = "http://localhost:3001/api";
 
@@ -239,13 +240,7 @@ function App() {
                 </div>
               </div>
             ) : (
-              <div className="panel-copy">
-                <span className="panel-badge">Manual mode</span>
-                <h2>Manual student interaction</h2>
-                <p>
-                  This is the manual workspace tab.
-                </p>
-              </div>
+              <ManualStudentInteractionView apiBase={API} active={activeTab === "manual"} />
             )}
           </div>
         </section>

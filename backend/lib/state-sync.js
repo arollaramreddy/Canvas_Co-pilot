@@ -506,7 +506,7 @@ function listRecentEvents(db, userId, courseId = null, limit = 30) {
   if (courseId) {
     return db
       .prepare(`
-        SELECT id, event_type, entity_type, entity_id, title, detail_json, status, created_at
+        SELECT id, course_id, event_type, entity_type, entity_id, title, detail_json, status, created_at
         FROM canvas_events
         WHERE user_id = ? AND course_id = ?
         ORDER BY id DESC
@@ -518,7 +518,7 @@ function listRecentEvents(db, userId, courseId = null, limit = 30) {
 
   return db
     .prepare(`
-      SELECT id, event_type, entity_type, entity_id, title, detail_json, status, created_at
+      SELECT id, course_id, event_type, entity_type, entity_id, title, detail_json, status, created_at
       FROM canvas_events
       WHERE user_id = ?
       ORDER BY id DESC

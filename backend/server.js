@@ -136,16 +136,40 @@ function getCanvasAccessToken(req) {
   return session?.accessToken || null;
 }
 
+function shouldUseCrossSiteSessionCookie() {
+  const host = String(process.env.HOST || "").trim();
+  const frontendUrl = String(process.env.FRONTEND_URL || "").trim();
+  const backendUrl = String(process.env.BACKEND_URL || "").trim();
+
+  if (process.env.NODE_ENV === "production") {
+    return true;
+  }
+
+  return (
+    host === "0.0.0.0" ||
+    frontendUrl.includes(".run.app") ||
+    backendUrl.includes(".run.app")
+  );
+}
+
 function setSessionCookie(res, sessionId) {
-  const isProd = process.env.NODE_ENV === "production";
+  const useCrossSiteCookie = shouldUseCrossSiteSessionCookie();
+  const sameSite = useCrossSiteCookie ? "None" : "Lax";
+  const secure = useCrossSiteCookie ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
-    `canvas_session=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax${isProd ? "; Secure" : ""}`
+    `canvas_session=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=${sameSite}${secure}`
   );
 }
 
 function clearSessionCookie(res) {
-  res.setHeader("Set-Cookie", "canvas_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Lax");
+  const useCrossSiteCookie = shouldUseCrossSiteSessionCookie();
+  const sameSite = useCrossSiteCookie ? "None" : "Lax";
+  const secure = useCrossSiteCookie ? "; Secure" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `canvas_session=; Path=/; HttpOnly; Max-Age=0; SameSite=${sameSite}${secure}`
+  );
 }
 
 function upsertUser(user) {

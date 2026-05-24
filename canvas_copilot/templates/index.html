@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Python Canvas study assistant</p>
+    <h1>Turn Canvas updates into focused study actions.</h1>
+    <p class="lede">
+      Canvas Co-Pilot connects to Canvas LMS, reads course context, and generates summaries,
+      flashcards, quizzes, study plans, and intervention recommendations.
+    </p>
+    {% if session %}
+      <a class="button" href="/workspace">Open workspace</a>
+    {% else %}
+      <a class="button" href="/login">Connect Canvas</a>
+    {% endif %}
+  </div>
+</section>
+
+<section class="grid three">
+  <article class="panel">
+    <h2>Canvas-aware</h2>
+    <p>Fetch active courses, assignments, files, and modules with a student Canvas token.</p>
+  </article>
+  <article class="panel">
+    <h2>Agentic workflow</h2>
+    <p>Generate coordinated learning artifacts from pasted notes or course material.</p>
+  </article>
+  <article class="panel">
+    <h2>Persistent memory</h2>
+    <p>Save workflow history, preferences, and activity in local SQLite storage.</p>
+  </article>
+</section>
+
+{% if session %}
+<section class="section">
+  <div class="section-heading">
+    <h2>Recent Runs</h2>
+    <p>{{ summary.workflow_runs }} saved workflows and {{ summary.events }} tracked events.</p>
+  </div>
+  <div class="list">
+    {% for run in runs %}
+      <a class="row" href="/history">
+        <span>{{ run.title }}</span>
+        <small>{{ run.workflow_type }} - {{ run.created_at }}</small>
+      </a>
+    {% else %}
+      <div class="empty">No workflow runs yet.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+[project]
+name = "canvas-copilot"
+version = "1.0.0"
+description = "Python Canvas LMS study assistant with FastAPI, SQLite, and server-rendered workflows."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "jinja2>=3.1.4",
+    "python-multipart>=0.0.9",
+    "requests>=2.32.0",
+    "itsdangerous>=2.2.0",
+]
+
+[project.scripts]
+canvas-copilot = "canvas_copilot.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["canvas_copilot*"]
+
+[tool.setuptools.package-data]
+canvas_copilot = ["templates/*.html", "static/*.css"]

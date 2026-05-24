@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="section-heading">
+    <h1>Workflow History</h1>
+    <p>Saved outputs from the Python agent workflow.</p>
+  </div>
+
+  <div class="list">
+    {% for run in runs %}
+      <article class="row tall">
+        <div>
+          <strong>{{ run.title }}</strong>
+          <small>{{ run.workflow_type }} - {{ run.created_at }}</small>
+        </div>
+        <p>{{ run.summary }}</p>
+      </article>
+    {% else %}
+      <div class="empty">No workflow history yet.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,345 +1,261 @@
-# Canvas Copilot — Agentic AI Layer for Canvas
+# Canvas Co-Pilot
 
-Canvas Co-Pilot turns Canvas from a passive course portal into an active academic support system. Instead of forcing students to constantly check for changes, interpret grades, read every file manually, and decide what to study next, the platform monitors course state, understands what changed, and generates useful learning support automatically.
+Canvas Co-Pilot is a Python study assistant for Canvas LMS. It connects to Canvas with a student access token, reads course context, and generates learning artifacts such as summaries, flashcards, quizzes, study plans, lesson outlines, and intervention signals.
 
-## Demo
-- Live app: https://canvas-copilot-frontend-595493608856.us-central1.run.app/
+This repository was migrated from a JavaScript/React/Node prototype into a Python-first application. The current implementation uses FastAPI, server-rendered HTML, SQLite, and Python learning-agent modules.
 
-## Problem
+## Why This Project Exists
 
-Students spend too much time managing coursework before they even start learning.
+Canvas is useful for storing course content, but students still have to decide what changed, what matters, and what to study next. Canvas Co-Pilot reduces that manual overhead by turning course material into action-oriented study support.
 
-Pain points we targeted:
+The app is designed for portfolio-style data and AI engineering practice:
 
-- checking Canvas repeatedly for new content
-- reading long PDFs and slides end to end
-- understanding why grades dropped
-- figuring out what to study next
-- converting raw course material into something actually useful for revision
+- Canvas API integration
+- token-based user sessions
+- workflow persistence in SQLite
+- agent-style study artifact generation
+- intervention scoring from assignment performance
+- a clean Python web application structure
 
-Canvas Co-Pilot reduces that overhead by turning course updates into guided study actions.
+## What The App Does
 
-## Solution
-
-Canvas Co-Pilot is a multi-agent study assistant built around Canvas LMS data.
-
-It can:
-
-- detect newly posted course content
-- summarize materials in a more learnable format
-- generate flashcards and quizzes
-- create structured study plans
-- generate lesson and video-style learning flows
-- react to performance signals such as weak grades
-- support both autonomous workflows and manual student requests
-
-The result is a system that moves students from "something changed" to "here is exactly what to do next."
-
-## Key Features
-
-- Autonomous mode that watches Canvas state and decides when help is needed
-- Manual mode where students can directly generate quizzes, flashcards, study plans, and lesson flows
-- Multi-agent workflow with specialized agents for parsing, summarization, quizzes, flashcards, video planning, and intervention
-- Personalized outputs shaped by course content and student preferences
-- Audio-backed lesson experience for guided study playback
-
-## Tech Stack
-
-### Frontend
-
-- React 19
-- Vite
-- Framer Motion
-- CSS
-
-### Backend
-
-- Node.js
-- Express
-- dotenv
-
-### AI and Agent Orchestration
-
-- LangGraph
-- LangChain Core
-- Gemini API
-- OpenAI-compatible API support
-
-### Data and Storage
-
-- SQLite
-- JSON file storage for saved artifacts
-
-### External Integrations
-
-- Canvas LMS API
-- ElevenLabs for lesson narration audio
-- Pexels for visual/media support
-
-## How It Works
-
-Canvas Co-Pilot supports two operating modes.
-
-### Autonomous Mode
-
-The system acts like a monitoring and intervention layer:
-
-1. fetch Canvas state
-2. detect meaningful changes
-3. decide which workflow should run
-4. coordinate multiple agents
-5. return learning artifacts to the UI
-
-This mode is designed for continuous support without requiring the student to manually orchestrate every step.
-
-### Manual Mode
-
-Students can directly open courses, modules, files, and workflows and request outputs such as:
-
-- flashcards
-- quizzes
-- study plans
-- lesson and video flows
-
-This mode gives students direct control while still using the same backend intelligence.
+1. Logs in with a Canvas Personal Access Token.
+2. Fetches active Canvas courses.
+3. Shows assignments, modules, files, and performance signals.
+4. Generates study outputs from pasted course material.
+5. Saves workflow history locally in SQLite.
+6. Exposes both browser pages and JSON API endpoints.
 
 ## Architecture
 
-The project is a full-stack monorepo:
+```mermaid
+flowchart LR
+    A[Canvas LMS API] --> B[CanvasClient]
+    B --> C[FastAPI app]
+    C --> D[Server-rendered HTML]
+    C --> E[Learning agents]
+    E --> F[Summary]
+    E --> G[Flashcards]
+    E --> H[Quiz]
+    E --> I[Study plan]
+    E --> J[Lesson outline]
+    C --> K[(SQLite)]
+
+    L[Student browser] --> C
+```
+
+## Data Flow
+
+| Step | Component | Description |
+| --- | --- | --- |
+| Login | `canvas_copilot.app` | Accepts a Canvas base URL and access token. |
+| Canvas access | `canvas_copilot.canvas_client` | Fetches profile, courses, assignments, modules, and files. |
+| Generation | `canvas_copilot.agents` | Builds summaries, flashcards, quizzes, plans, lessons, and risk signals. |
+| Storage | `canvas_copilot.storage` | Stores users, sessions, events, preferences, and workflow runs in SQLite. |
+| UI | Jinja templates | Renders pages without a JavaScript frontend build step. |
+
+## Project Structure
 
 ```text
-frontend/   React + Vite student interface
-backend/    Express API, Canvas integration, LangGraph orchestration, storage
+.
++-- README.md
++-- pyproject.toml
++-- .env.example
++-- canvas_copilot
+|   +-- app.py
+|   +-- agents.py
+|   +-- canvas_client.py
+|   +-- config.py
+|   +-- storage.py
+|   +-- static
+|   |   +-- styles.css
+|   +-- templates
+|       +-- base.html
+|       +-- index.html
+|       +-- login.html
+|       +-- courses.html
+|       +-- course_detail.html
+|       +-- workspace.html
+|       +-- history.html
++-- tests
+    +-- test_agents.py
 ```
 
-### Frontend
+## Tech Stack
 
-The frontend provides the student-facing workspace, including:
+- Python 3.11+
+- FastAPI
+- Uvicorn
+- Jinja2
+- SQLite
+- Requests
+- Pytest
 
-- autonomous workflow dashboard
-- study plan workspace
-- quiz workspace
-- manual student interaction workspace
-- lesson player experience
+## Prerequisites
 
-Important files:
+Install:
 
-- [frontend/src/App.jsx](frontend/src/App.jsx)
-- [frontend/src/manual/ManualStudentInteractionView.jsx](frontend/src/manual/ManualStudentInteractionView.jsx)
-- [frontend/src/study-plan/StudyPlanWorkspace.jsx](frontend/src/study-plan/StudyPlanWorkspace.jsx)
-- [frontend/src/quiz/QuizWorkspace.jsx](frontend/src/quiz/QuizWorkspace.jsx)
+- Python 3.11 or later
+- Git
+- A Canvas Personal Access Token, unless using demo mode
 
-### Backend
+## Setup
 
-The backend coordinates Canvas, workflow state, AI services, and artifact generation.
-
-Main responsibilities:
-
-- authenticate students with a Canvas Personal Access Token
-- fetch and normalize Canvas courses, modules, files, assignments, and messages
-- store runtime data and user preferences
-- run AI-powered workflows
-- coordinate LangGraph-based agent execution
-- generate lesson audio and video-related outputs
-
-Important files:
-
-- [backend/server.js](backend/server.js)
-- [backend/lib/db.js](backend/lib/db.js)
-- [backend/lib/langgraph-runtime.js](backend/lib/langgraph-runtime.js)
-
-## Agentic Workflow
-
-The agent system is built around a central orchestrator and shared runtime state.
-
-High-level flow:
-
-1. Canvas state is collected and normalized.
-2. A change-detection layer determines whether something meaningful happened.
-3. The orchestrator selects which agents should run.
-4. Agents exchange outputs through shared workflow state.
-5. The frontend receives a coherent result instead of disconnected tool calls.
-
-Main orchestration files:
-
-- [backend/agents/agentic-workflow/agent-6-orchestrator.js](backend/agents/agentic-workflow/agent-6-orchestrator.js)
-- [backend/agents/agentic-workflow/index.js](backend/agents/agentic-workflow/index.js)
-- [backend/agents/agentic-workflow/contracts/runtime-state-contract.js](backend/agents/agentic-workflow/contracts/runtime-state-contract.js)
-
-### Agent Roles
-
-#### Agent 1: Parse and Research
-
-- reads selected topic or module content
-- grounds the workflow in source material
-- prepares the content package for downstream agents
-
-#### Agent 2: Summarize by Preference
-
-- adapts explanations to student preferences
-- converts raw source material into a more learnable format
-
-#### Agent 3: Create Flashcards
-
-- transforms summary content into recall-oriented study cards
-
-#### Agent 4: Create Quizzes
-
-- generates checks-for-understanding from the learning package
-
-#### Agent 5: Create Video Plan
-
-- prepares a lesson or video-oriented explanation structure
-- organizes examples, scenarios, and teaching cues
-
-#### Agent 6: Create Study Plan
-
-- turns deadlines, scope, and learning needs into sessions and milestones
-
-#### Agent 7: State Change Decider
-
-- detects important Canvas events
-- decides what workflow should run next
-- acts as the policy layer for autonomous behavior
-
-#### Agent 8: Grade Intervention
-
-- reasons about poor performance
-- identifies recovery direction
-- triggers reinforcement and study-plan support
-
-For a deeper breakdown, see:
-
-- [backend/agents/agentic-workflow/README.md](backend/agents/agentic-workflow/README.md)
-
-## Why This Is Hackathon-Worthy
-
-- It reframes LMS platforms from passive dashboards into active support systems.
-- It combines real educational workflow pain points with agent-based decision making.
-- It goes beyond summarization and builds actionable outputs such as quizzes, plans, and guided lessons.
-- It blends automation with student control instead of forcing a one-mode experience.
-
-## What We Built During The Hackathon
-
-- Canvas course and content ingestion
-- manual and autonomous workflow modes
-- multi-agent orchestration for study support generation
-- quiz, flashcard, study-plan, and lesson generation
-- audio-backed lesson playback experience
-- backend persistence for saved artifacts and preferences
-
-## Challenges We Ran Into
-
-- integrating with Canvas using a practical authentication flow without institutional OAuth setup
-- coordinating multiple agents while keeping outputs structured and state-aware
-- converting raw course data into workflows that feel genuinely useful to students
-- generating and playing lesson audio reliably inside browser autoplay restrictions
-- balancing autonomous behavior with manual user control
-
-## Future Work
-
-- institutional OAuth instead of Canvas Personal Access Token login
-- stronger personalization based on long-term student learning history
-- push notifications and proactive reminders for high-priority course changes
-- broader autonomous intervention workflows for grades, deadlines, and missing work
-- richer lesson generation with stronger visuals and more adaptive pacing
-- mobile-first delivery experience
-
-## Authentication
-
-The project currently uses a Canvas Personal Access Token for authentication.
-
-That means:
-
-- a student logs in with a Canvas token through the UI
-- the backend uses that token to fetch Canvas data
-
-This approach was used because full institutional SSO and OAuth approval typically requires admin-level setup.
-
-## Storage
-
-The backend currently uses a mix of:
-
-- SQLite for runtime and preference data
-- JSON files for some saved study-plan and quiz state
-- generated asset directories for lesson audio and video outputs
-
-Important files:
-
-- [backend/data/copilot.db](backend/data/copilot.db)
-- [backend/data/study-plans.json](backend/data/study-plans.json)
-- [backend/data/quizzes.json](backend/data/quizzes.json)
-
-## Local Setup
-
-### 1. Install dependencies
-
-From the repo root:
+Clone the repository:
 
 ```bash
-npm run install:backend
-npm run install:frontend
+git clone https://github.com/arollaramreddy/Canvas_Co-pilot.git
+cd Canvas_Co-pilot
 ```
 
-### 2. Configure environment variables
+Create and activate a virtual environment:
 
-Create `backend/.env` with values like:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Install the app:
+
+```bash
+pip install -e .
+```
+
+Create the local environment file:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env`:
 
 ```env
+APP_SECRET_KEY=change_me_to_a_long_random_secret
 CANVAS_BASE_URL=https://canvas.asu.edu/api/v1
-OPENAI_API_KEY=your_openai_api_key
-GEMINI_API_KEY=your_gemini_api_key
-ELEVENLABS_API_KEY=your_elevenlabs_api_key
-FRONTEND_URL=http://localhost:5173
-BACKEND_URL=http://localhost:3001
+DATA_DIR=data
+HOST=127.0.0.1
+PORT=8000
+DEMO_MODE=false
 ```
-
-Optional variables can include:
-
-- `ELEVENLABS_VOICE_ID`
-- `ELEVENLABS_MODEL_ID`
-- `PEXELS_API_KEY`
-- `HOST`
-- `PORT`
-
-You do not need to hardcode a Canvas token into `.env`. The student provides it during login.
 
 ## How To Run
 
-Use two terminals from the repo root.
-
-### Terminal 1: backend
+Start the Python web app:
 
 ```bash
-npm run dev:backend
+uvicorn canvas_copilot.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Terminal 2: frontend
+Open:
+
+```text
+http://127.0.0.1:8000
+```
+
+You can also use the installed console command:
 
 ```bash
-npm run dev:frontend
+canvas-copilot
 ```
 
-App URLs:
+## Demo Mode
 
-- Frontend: `http://localhost:5173`
-- Backend API: `http://127.0.0.1:3001`
+To explore the app without Canvas credentials, set:
 
-## Production Build Commands
+```env
+DEMO_MODE=true
+```
 
-From the repo root:
+Then open `/login` and submit the token value:
+
+```text
+demo
+```
+
+The app will show sample courses, assignments, files, modules, intervention scoring, and workflow generation.
+
+## Main Pages
+
+| Page | Purpose |
+| --- | --- |
+| `/` | Product overview and recent workflow runs. |
+| `/login` | Connect with Canvas token or demo token. |
+| `/courses` | List active Canvas courses. |
+| `/courses/{course_id}` | Show assignments, modules, files, and risk signals. |
+| `/workspace` | Generate summaries, flashcards, quizzes, study plans, and lessons. |
+| `/history` | Review saved workflow runs. |
+
+## API Endpoints
+
+| Endpoint | Method | Description |
+| --- | --- | --- |
+| `/api/auth/me` | GET | Returns the active session user. |
+| `/api/courses` | GET | Lists Canvas courses. |
+| `/api/courses/{course_id}/assignments` | GET | Lists assignments and intervention score. |
+| `/api/agentic-workflow` | POST | Generates a full or selected workflow from text. |
+| `/api/study-plan` | POST | Generates a study plan. |
+| `/api/quizzes/generate` | POST | Generates quiz questions. |
+| `/api/workflow-runs` | GET | Lists saved workflow runs. |
+
+Example workflow request:
 
 ```bash
-npm run build
-npm run lint
+curl -X POST http://127.0.0.1:8000/api/agentic-workflow \
+  -H "Content-Type: application/json" \
+  -d '{"workflow_type":"agentic","title":"Module review","source_text":"Paste course material here"}'
 ```
+
+The API requires a logged-in browser session. Use the web login first, or extend the app with API-token authentication for external clients.
+
+## Canvas Token Notes
+
+This project uses a Canvas Personal Access Token because it is simpler for a portfolio or local prototype than institutional OAuth.
+
+Typical Canvas token path:
+
+```text
+Canvas -> Account -> Settings -> Approved Integrations -> New Access Token
+```
+
+The token is stored in your local SQLite database under `DATA_DIR`. Do not commit `.env`, `data/`, or database files.
+
+## Testing
+
+Run the unit tests:
+
+```bash
+python -m unittest discover -s tests
+```
+
+Run a syntax check:
+
+```bash
+python -m compileall canvas_copilot tests
+```
+
+## What Changed From The JavaScript Version
+
+- Replaced the React/Vite frontend with server-rendered FastAPI pages.
+- Replaced the Express backend with Python FastAPI routes.
+- Replaced JavaScript agent modules with Python functions in `canvas_copilot.agents`.
+- Removed tracked generated audio files and Node package files.
+- Kept the product idea: Canvas-aware study support, workflow history, and student intervention signals.
+
+## Production Readiness Notes
+
+This is a local-first Python prototype. For production, add:
+
+- institutional OAuth instead of Personal Access Token login
+- encrypted token storage
+- persistent server-side session storage
+- stronger PDF text extraction
+- real LLM integration with structured output validation
+- background jobs for long-running workflows
+- role-based access control
+- deployment configuration for Cloud Run, ECS, or Kubernetes
 
 ## Team
 
 - Niharika Ravilla
 - Ram Reddy
-- Suraj Shinde 
-
-## Summary
-
-Canvas Co-Pilot is not just a Canvas dashboard. It is a multi-agent student support system that watches course activity, understands changes, decides what action is needed, and generates learning support automatically while still allowing manual control when students want it.
+- Suraj Shinde

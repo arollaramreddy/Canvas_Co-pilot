@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="section-heading">
+    <h1>Course {{ course_id }}</h1>
+    <p>Assignments, modules, files, and intervention signals.</p>
+  </div>
+
+  {% if error %}
+    <div class="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="grid three">
+    <article class="panel metric">
+      <span>Intervention score</span>
+      <strong>{{ intervention.score }}</strong>
+      <p>{{ intervention.level }} risk</p>
+    </article>
+    <article class="panel metric">
+      <span>Average</span>
+      <strong>{{ intervention.average or "n/a" }}</strong>
+      <p>Based on graded assignments</p>
+    </article>
+    <article class="panel metric">
+      <span>Missing</span>
+      <strong>{{ intervention.missing_assignments }}</strong>
+      <p>{{ intervention.recommendation }}</p>
+    </article>
+  </div>
+
+  <section class="subsection">
+    <h2>Assignments</h2>
+    <div class="list">
+      {% for assignment in assignments %}
+        <div class="row">
+          <span>{{ assignment.name }}</span>
+          <small>Due {{ assignment.due_at or "not listed" }} - Grade {{ assignment.grade or "n/a" }}</small>
+        </div>
+      {% else %}
+        <div class="empty">No assignments found.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="subsection">
+    <h2>Modules</h2>
+    <div class="list">
+      {% for module in modules %}
+        <div class="row">
+          <span>{{ module.name }}</span>
+          <small>Position {{ module.position or "n/a" }}</small>
+        </div>
+      {% else %}
+        <div class="empty">No modules found.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="subsection">
+    <h2>Files</h2>
+    <div class="list">
+      {% for file in files %}
+        <div class="row">
+          <span>{{ file.display_name }}</span>
+          <small>{{ file.content_type or "file" }} - {{ file.size or 0 }} bytes</small>
+        </div>
+      {% else %}
+        <div class="empty">No files found.</div>
+      {% endfor %}
+    </div>
+  </section>
+</section>
+{% endblock %}

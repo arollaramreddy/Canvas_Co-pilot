@@ -1,0 +1,47 @@
+# Kubernetes Namespace for Canvas Co-Pilot
+# Isolates all copilot resources from other workloads in the cluster
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: canvas-copilot
+  labels:
+    app.kubernetes.io/name: canvas-copilot
+    app.kubernetes.io/managed-by: kubectl
+    environment: production
+  annotations:
+    description: "Canvas Co-Pilot multi-agent AI assistant namespace"
+---
+# Resource Quota: prevent runaway resource usage
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: canvas-copilot-quota
+  namespace: canvas-copilot
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    pods: "30"
+    services: "15"
+    persistentvolumeclaims: "10"
+---
+# LimitRange: set default resource requests/limits per container
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: canvas-copilot-limits
+  namespace: canvas-copilot
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      max:
+        cpu: "4"
+        memory: "8Gi"

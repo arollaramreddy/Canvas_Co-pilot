@@ -1,0 +1,191 @@
+# ─── Canvas Co-Pilot FastAPI Application Deployment ────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: canvas-copilot-app
+  namespace: canvas-copilot
+  labels:
+    app: canvas-copilot-app
+    tier: backend
+    version: "1.0.0"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: canvas-copilot-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: canvas-copilot-app
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: canvas-copilot-sa
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: app
+          image: canvascopilot.azurecr.io/canvas-copilot:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: canvas-copilot-config
+            - secretRef:
+                name: canvas-copilot-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: canvas-copilot-data-pvc
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: canvas-copilot-app
+                topologyKey: kubernetes.io/hostname
+---
+# ─── Service: exposes the app within the cluster ────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: canvas-copilot-svc
+  namespace: canvas-copilot
+  labels:
+    app: canvas-copilot-app
+spec:
+  selector:
+    app: canvas-copilot-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+  type: ClusterIP
+---
+# ─── Ingress: external HTTPS access via NGINX ───────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canvas-copilot-ingress
+  namespace: canvas-copilot
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - copilot.yourdomain.com
+      secretName: canvas-copilot-tls
+  rules:
+    - host: copilot.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: canvas-copilot-svc
+                port:
+                  number: 80
+---
+# ─── HPA: auto-scale app pods based on CPU usage ────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: canvas-copilot-app-hpa
+  namespace: canvas-copilot
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: canvas-copilot-app
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+---
+# ─── PVC: persistent data volume for SQLite database ────────────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: canvas-copilot-data-pvc
+  namespace: canvas-copilot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-premium
+  resources:
+    requests:
+      storage: 5Gi
+---
+# ─── ServiceAccount ──────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: canvas-copilot-sa
+  namespace: canvas-copilot
+  labels:
+    app: canvas-copilot-app

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="section-heading">
+    <h1>Courses</h1>
+    <p>Active Canvas courses available to this session.</p>
+  </div>
+
+  {% if error %}
+    <div class="alert">{{ error }}</div>
+  {% endif %}
+
+  <div class="grid two">
+    {% for course in courses %}
+      <a class="panel link-panel" href="/courses/{{ course.id }}">
+        <h2>{{ course.name }}</h2>
+        <p>{{ course.course_code or course.workflow_state }}</p>
+      </a>
+    {% else %}
+      <div class="empty">No courses found.</div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

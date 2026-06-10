@@ -1,0 +1,106 @@
+# ─── ChromaDB: Vector Store for Course Content Embeddings ──────────────────────
+# ChromaDB stores sentence-transformer embeddings of Canvas course content.
+# Agents query it to retrieve semantically relevant context chunks, reducing
+# prompt token usage and improving quiz/summary quality.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: chromadb
+  namespace: canvas-copilot
+  labels:
+    app: chromadb
+    tier: vector-store
+spec:
+  serviceName: chromadb-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chromadb
+  template:
+    metadata:
+      labels:
+        app: chromadb
+        tier: vector-store
+    spec:
+      containers:
+        - name: chromadb
+          image: chromadb/chroma:0.5.0
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: CHROMA_SERVER_HOST
+              value: "0.0.0.0"
+            - name: CHROMA_SERVER_HTTP_PORT
+              value: "8000"
+            - name: ANONYMIZED_TELEMETRY
+              value: "false"
+            - name: IS_PERSISTENT
+              value: "true"
+            - name: PERSIST_DIRECTORY
+              value: "/chroma/chroma"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: chroma-data
+              mountPath: /chroma/chroma
+  volumeClaimTemplates:
+    - metadata:
+        name: chroma-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: managed-premium
+        resources:
+          requests:
+            storage: 10Gi
+---
+# ─── ChromaDB Headless Service ───────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: chromadb-headless
+  namespace: canvas-copilot
+  labels:
+    app: chromadb
+spec:
+  selector:
+    app: chromadb
+  clusterIP: None
+  ports:
+    - port: 8000
+      name: http
+---
+# ─── ChromaDB ClusterIP Service ──────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: chromadb
+  namespace: canvas-copilot
+  labels:
+    app: chromadb
+spec:
+  selector:
+    app: chromadb
+  ports:
+    - port: 8001
+      targetPort: 8000
+      name: http
+  type: ClusterIP

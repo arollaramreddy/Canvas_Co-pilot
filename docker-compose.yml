@@ -1,0 +1,128 @@
+version: "3.9"
+
+services:
+  # ── Canvas Co-Pilot FastAPI application ──────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: canvas-copilot:local
+    container_name: canvas_copilot_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      APP_SECRET_KEY: ${APP_SECRET_KEY:-dev-secret-change-in-production}
+      CANVAS_BASE_URL: ${CANVAS_BASE_URL:-https://canvas.asu.edu/api/v1}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DATA_DIR: /app/data
+      REDIS_URL: redis://redis:6379/0
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8001"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - app_data:/app/data
+    depends_on:
+      redis:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    networks:
+      - copilot_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Redis: caching layer for agent responses and session data ─────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: canvas_copilot_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - copilot_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── ChromaDB: vector store for course content embeddings ─────────────────────
+  chromadb:
+    image: chromadb/chroma:0.5.0
+    container_name: canvas_copilot_chromadb
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      CHROMA_SERVER_HOST: "0.0.0.0"
+      CHROMA_SERVER_HTTP_PORT: "8000"
+      ANONYMIZED_TELEMETRY: "false"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - copilot_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # ── Prometheus: metrics collection ───────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: canvas_copilot_prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=15d"
+    networks:
+      - copilot_net
+    profiles:
+      - monitoring
+
+  # ── Grafana: metrics dashboard ───────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.3.0
+    container_name: canvas_copilot_grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - copilot_net
+    profiles:
+      - monitoring
+
+volumes:
+  app_data:
+  redis_data:
+  chroma_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  copilot_net:
+    driver: bridge

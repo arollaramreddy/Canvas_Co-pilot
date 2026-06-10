@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="narrow">
+  <h1>Connect Canvas</h1>
+  <p class="muted">Use a Canvas Personal Access Token. The token is stored only in your local SQLite database.</p>
+
+  <form class="form" action="/login" method="post">
+    <label>
+      Canvas API base URL
+      <input name="canvas_base_url" value="{{ canvas_base_url }}" placeholder="https://canvas.asu.edu/api/v1">
+    </label>
+    <label>
+      Canvas access token
+      <input name="access_token" type="password" placeholder="Paste Canvas token">
+    </label>
+    <button class="button" type="submit">Connect</button>
+  </form>
+
+  {% if demo_mode %}
+    <p class="muted">Demo mode is enabled. Submit the form with token <code>demo</code> to explore without Canvas.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="section">
+  <div class="section-heading">
+    <h1>Learning Workspace</h1>
+    <p>Paste notes, file text, assignment instructions, or a module summary.</p>
+  </div>
+
+  <form class="form" action="/workspace" method="post">
+    <div class="grid two">
+      <label>
+        Title
+        <input name="title" value="Manual workflow">
+      </label>
+      <label>
+        Workflow type
+        <select name="workflow_type">
+          <option value="agentic">Full agentic workflow</option>
+          <option value="summary">Summary</option>
+          <option value="flashcards">Flashcards</option>
+          <option value="quiz">Quiz</option>
+          <option value="study_plan">Study plan</option>
+          <option value="lesson">Lesson</option>
+        </select>
+      </label>
+    </div>
+    <label>
+      Course ID, optional
+      <input name="course_id" placeholder="Canvas course id">
+    </label>
+    <label>
+      Source material
+      <textarea name="source_text" rows="12" placeholder="Paste course material here"></textarea>
+    </label>
+    <button class="button" type="submit">Generate</button>
+  </form>
+
+  {% if result %}
+    <section class="result">
+      <h2>{{ result.title }}</h2>
+      <p>{{ result.overview }}</p>
+
+      {% if result.assets.summary %}
+        <article class="panel">
+          <h3>Summary</h3>
+          <ul>
+            {% for point in result.assets.summary.key_points %}
+              <li>{{ point }}</li>
+            {% endfor %}
+          </ul>
+        </article>
+      {% endif %}
+
+      {% if result.assets.flashcards %}
+        <article class="panel">
+          <h3>Flashcards</h3>
+          {% for card in result.assets.flashcards %}
+            <div class="mini-card">
+              <strong>{{ card.front }}</strong>
+              <p>{{ card.back }}</p>
+            </div>
+          {% endfor %}
+        </article>
+      {% endif %}
+
+      {% if result.assets.quiz %}
+        <article class="panel">
+          <h3>Quiz</h3>
+          {% for item in result.assets.quiz %}
+            <div class="mini-card">
+              <strong>{{ item.question }}</strong>
+              <p>Answer: {{ item.answer }}</p>
+            </div>
+          {% endfor %}
+        </article>
+      {% endif %}
+
+      {% if result.assets.study_plan %}
+        <article class="panel">
+          <h3>Study Plan</h3>
+          {% for session_item in result.assets.study_plan %}
+            <div class="mini-card">
+              <strong>{{ session_item.day }} - {{ session_item.title }}</strong>
+              <p>{{ session_item.goal }}</p>
+            </div>
+          {% endfor %}
+        </article>
+      {% endif %}
+
+      {% if result.assets.lesson %}
+        <article class="panel">
+          <h3>Lesson</h3>
+          <p>{{ result.assets.lesson.opening }}</p>
+          {% for section in result.assets.lesson.sections %}
+            <div class="mini-card">
+              <strong>{{ section.heading }}</strong>
+              <p>{{ section.talk_track }}</p>
+            </div>
+          {% endfor %}
+        </article>
+      {% endif %}
+    </section>
+  {% endif %}
+</section>
+{% endblock %}

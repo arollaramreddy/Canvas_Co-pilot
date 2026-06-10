@@ -1,0 +1,53 @@
+# ─── ConfigMap: non-sensitive runtime configuration ──────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: canvas-copilot-config
+  namespace: canvas-copilot
+  labels:
+    app: canvas-copilot-app
+data:
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  DEMO_MODE: "false"
+  DATA_DIR: "/app/data"
+  LOG_LEVEL: "info"
+  REDIS_URL: "redis://redis:6379/0"
+  CHROMA_HOST: "chromadb"
+  CHROMA_PORT: "8001"
+  CANVAS_BASE_URL: "https://canvas.asu.edu/api/v1"
+  # MCP (Model Context Protocol) settings
+  MCP_MAX_CONTEXT_TOKENS: "8192"
+  MCP_CONTEXT_TTL_SECONDS: "3600"
+  MCP_SUMMARIZATION_THRESHOLD: "0.85"
+  # Agent settings
+  AGENT_MAX_RETRIES: "3"
+  AGENT_TIMEOUT_SECONDS: "30"
+  AGENT_CACHE_TTL_SECONDS: "1800"
+  # LangGraph settings
+  LANGGRAPH_CHECKPOINT_ENABLED: "true"
+  LANGGRAPH_MAX_ITERATIONS: "10"
+  # Embedding model
+  EMBEDDING_MODEL: "all-MiniLM-L6-v2"
+  EMBEDDING_BATCH_SIZE: "32"
+  CHROMA_COLLECTION_NAME: "canvas_course_content"
+---
+# ─── Secret template: sensitive credentials ──────────────────────────────────────
+# NOTE: Do NOT commit real values. Use sealed-secrets, Azure Key Vault CSI,
+# or External Secrets Operator to inject secrets at deploy time.
+# The values below are placeholders for documentation only.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: canvas-copilot-secrets
+  namespace: canvas-copilot
+  labels:
+    app: canvas-copilot-app
+  annotations:
+    description: "Populate via: kubectl create secret generic canvas-copilot-secrets --from-env-file=.env"
+type: Opaque
+stringData:
+  APP_SECRET_KEY: "REPLACE_WITH_LONG_RANDOM_SECRET"
+  ANTHROPIC_API_KEY: "REPLACE_WITH_ANTHROPIC_KEY"
+  REDIS_PASSWORD: "REPLACE_WITH_REDIS_PASSWORD"
+  CANVAS_ACCESS_TOKEN: "REPLACE_WITH_CANVAS_TOKEN"
